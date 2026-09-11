@@ -218,8 +218,8 @@ class MockStreamerTestbench:
             sample_alert = alerts_data[0]
             print(f"  Station:    {sample_alert['station_id']}")
             print(f"  Severity:   {sample_alert['severity']}")
-            print(f"  Class:      {sample_alert['fault_class']}")
-            print(f"  Diagnostic: {sample_alert['diagnostic_msg']}")
+            print(f"  Class:      {sample_alert.get('fault_type', sample_alert.get('fault_class', 'N/A'))}")
+            print(f"  Diagnostic: {sample_alert.get('diagnostic_msg', 'N/A')}")
 
         print("=" * 75 + "\n")
 
