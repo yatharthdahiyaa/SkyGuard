@@ -34,7 +34,8 @@ import {
   Mail,
   Smartphone,
   Send,
-  X
+  X,
+  BellOff
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -43,6 +44,8 @@ interface SettingsViewProps {
   streamRateMs: number;
   onChangeStreamRate: (rate: number) => void;
   theme?: 'dark' | 'light';
+  notificationsEnabled?: boolean;
+  onToggleNotifications?: () => void;
   onToggleTheme?: () => void;
   onInjectAnomaly: () => void;
   onResetSimulation: () => void;
@@ -56,6 +59,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   streamRateMs,
   onChangeStreamRate,
   theme,
+  notificationsEnabled = true,
+  onToggleNotifications,
   onToggleTheme,
   onInjectAnomaly,
   onResetSimulation
@@ -101,7 +106,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleToggleRule = (id: string) => {
-    setNotificationRules(prev => prev.map(r => r.id === id ? { ...r, email: !r.email } : r));
+    setNotificationRules(prev => prev.map(r => r.id === id ? { ...r, email: !r.email, sms: !r.sms, push: !r.push } : r));
+  };
+
+  const handleMuteAllRules = () => {
+    setNotificationRules(prev => prev.map(r => ({ ...r, email: false, sms: false, push: false })));
+    triggerSaveBanner('All escalation dispatch policies have been disabled.');
+  };
+
+  const handleEnableAllRules = () => {
+    setNotificationRules(prev => prev.map(r => ({ ...r, email: true, sms: true, push: true })));
+    triggerSaveBanner('All escalation dispatch policies have been enabled.');
   };
 
   const handleToggleUserStatus = (id: string) => {
@@ -293,20 +308,71 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {activeTab === 'notifications' && (
         <div className="settings-tab-content">
           <div className="panel p-5">
-            <div className="flex items-center justify-between mb-4">
+            {/* Master In-App Notifications Switch */}
+            <div className="mb-5 p-4 rounded-lg border border-slate-800 bg-slate-950/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-primary text-sm">REAL-TIME IN-APP NOTIFICATIONS</span>
+                  <span className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-bold border ${
+                    notificationsEnabled 
+                      ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-400' 
+                      : 'bg-rose-950/50 border-rose-500/50 text-rose-400'
+                  }`}>
+                    {notificationsEnabled ? 'STATUS: ACTIVE (TOASTS ON)' : 'STATUS: MUTED (TOASTS OFF)'}
+                  </span>
+                </div>
+                <p className="text-secondary text-xs mt-1">
+                  Master switch to suppress all live telemetry anomaly popup toasts and supervisory notification banners.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {onToggleNotifications && (
+                  <button
+                    onClick={onToggleNotifications}
+                    className={`px-3.5 py-1.5 rounded text-xs font-mono font-bold border flex items-center gap-2 transition-all ${
+                      notificationsEnabled
+                        ? 'bg-rose-950/40 border-rose-500/60 text-rose-300 hover:bg-rose-900/60 shadow-lg shadow-rose-950/30'
+                        : 'bg-emerald-950/40 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60 shadow-lg shadow-emerald-950/30'
+                    }`}
+                  >
+                    {notificationsEnabled ? <BellOff size={14} /> : <Bell size={14} />}
+                    <span>{notificationsEnabled ? 'TURN OFF NOTIFICATIONS' : 'TURN ON NOTIFICATIONS'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
               <div>
                 <h2 className="text-primary font-bold text-base">INCIDENT ESCALATION &amp; DISPATCH POLICIES</h2>
                 <p className="text-secondary text-xs mt-1">
                   Define automated dispatch routes for telemetry invariant breaches and station connectivity drops.
                 </p>
               </div>
-              <button 
-                onClick={() => setRuleModalOpen(true)}
-                className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5 rounded"
-              >
-                <Plus size={13} />
-                <span>ADD ESCALATION RULE</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleMuteAllRules}
+                  className="px-2.5 py-1 rounded text-xs font-mono border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500"
+                  title="Disable email/sms/push across all rules"
+                >
+                  MUTE ALL DISPATCH
+                </button>
+                <button
+                  onClick={handleEnableAllRules}
+                  className="px-2.5 py-1 rounded text-xs font-mono border border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/30"
+                  title="Enable email/sms/push across all rules"
+                >
+                  ENABLE ALL DISPATCH
+                </button>
+                <button 
+                  onClick={() => setRuleModalOpen(true)}
+                  className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5 rounded"
+                >
+                  <Plus size={13} />
+                  <span>ADD ESCALATION RULE</span>
+                </button>
+              </div>
             </div>
 
             <div className="notification-rules-list flex flex-col gap-3">

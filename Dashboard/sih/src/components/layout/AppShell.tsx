@@ -13,6 +13,7 @@ import {
   X, 
   Search, 
   Bell, 
+  BellOff,
   LogOut, 
   Sun, 
   Moon, 
@@ -32,6 +33,8 @@ interface AppShellProps {
   totalAlertsCount: number;
   stationsCount?: number;
   theme?: 'dark' | 'light';
+  notificationsEnabled?: boolean;
+  onToggleNotifications?: () => void;
   onToggleTheme?: () => void;
   onOpenCommandPalette: () => void;
   onOpenLogoutModal: () => void;
@@ -46,8 +49,10 @@ export const AppShell: React.FC<AppShellProps> = ({
   lastMessageAt,
   activeCriticalAlertsCount,
   totalAlertsCount,
-  stationsCount = 54,
+  stationsCount = 16,
   theme = 'light',
+  notificationsEnabled = true,
+  onToggleNotifications,
   onToggleTheme,
   onOpenCommandPalette,
   onOpenLogoutModal,
@@ -262,22 +267,62 @@ export const AppShell: React.FC<AppShellProps> = ({
             {/* Notification Bell with Dropdown */}
             <div className="notification-dropdown-wrapper">
               <button 
-                className={`header-icon-btn ${notificationsOpen ? 'active' : ''}`}
+                className={`header-icon-btn ${notificationsOpen ? 'active' : ''} ${!notificationsEnabled ? 'text-amber-400' : ''}`}
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                title="System Notifications"
+                title={notificationsEnabled ? "System Notifications (Click to view/mute)" : "Notifications Muted (Click to view/unmute)"}
               >
-                <Bell size={16} />
-                {totalAlertsCount > 0 && <span className="notification-counter-dot" />}
+                {notificationsEnabled ? <Bell size={16} /> : <BellOff size={16} className="text-amber-400" />}
+                {notificationsEnabled && totalAlertsCount > 0 && <span className="notification-counter-dot" />}
               </button>
 
               {notificationsOpen && (
                 <div className="header-dropdown-menu panel font-mono">
-                  <div className="dropdown-header">
-                    <span>TELEMETRY BUS EVENTS ({totalAlertsCount})</span>
+                  <div className="dropdown-header flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>TELEMETRY BUS ({totalAlertsCount})</span>
+                      {!notificationsEnabled && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 font-bold">
+                          MUTED
+                        </span>
+                      )}
+                    </div>
                     <button onClick={() => setNotificationsOpen(false)} className="close-dropdown-btn">
                       <X size={13} />
                     </button>
                   </div>
+
+                  {/* Master Notification Toggle Strip */}
+                  <div className="px-3 py-2 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      {notificationsEnabled ? (
+                        <Bell size={13} className="text-emerald-400 flex-shrink-0" />
+                      ) : (
+                        <BellOff size={13} className="text-amber-400 flex-shrink-0" />
+                      )}
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-200">
+                          {notificationsEnabled ? 'Live Toasts Active' : 'Live Toasts Muted'}
+                        </div>
+                        <div className="text-[9px] text-slate-400">
+                          {notificationsEnabled ? 'Floating alerts enabled' : 'Popup toasts suppressed'}
+                        </div>
+                      </div>
+                    </div>
+                    {onToggleNotifications && (
+                      <button
+                        onClick={onToggleNotifications}
+                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                          notificationsEnabled 
+                            ? 'bg-rose-950/40 border-rose-500/50 text-rose-300 hover:bg-rose-900/60' 
+                            : 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
+                        }`}
+                        title={notificationsEnabled ? "Turn off floating anomaly notifications" : "Turn on floating anomaly notifications"}
+                      >
+                        {notificationsEnabled ? 'TURN OFF' : 'TURN ON'}
+                      </button>
+                    )}
+                  </div>
+
                   <div className="dropdown-event-list">
                     <div className="dropdown-event-item cursor-pointer" onClick={() => { navigate('/alerts/alt-8092'); setNotificationsOpen(false); }}>
                       <div className="event-top">

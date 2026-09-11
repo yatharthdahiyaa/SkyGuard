@@ -34,6 +34,23 @@ function AppContent() {
   const [stations, setStations] = useState<Station[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
 
+  // Master Notification Switch (saved in localStorage)
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('skyguard_notifications_enabled');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleNotifications = useCallback(() => {
+    setNotificationsEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem('skyguard_notifications_enabled', String(next));
+      if (!next) {
+        setToasts([]); // Immediately dismiss visible toasts on mute
+      }
+      return next;
+    });
+  }, []);
+
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
@@ -56,8 +73,10 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Push Toast helper
+  // Push Toast helper (suppressed when notifications are disabled)
   const addAnomalyToast = useCallback((alert: AlertEvent) => {
+    if (!notificationsEnabled) return;
+
     const newToast: ToastItem = {
       id: `toast-${Date.now()}-${Math.random()}`,
       stationId: alert.stationId,
@@ -73,7 +92,7 @@ function AppContent() {
     };
 
     setToasts((prev) => [newToast, ...prev.slice(0, 3)]);
-  }, [navigate]);
+  }, [navigate, notificationsEnabled]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -674,6 +693,8 @@ function AppContent() {
       totalAlertsCount={alerts.filter((a) => a.status === 'active').length}
       stationsCount={stations.length}
       theme="light"
+      notificationsEnabled={notificationsEnabled}
+      onToggleNotifications={handleToggleNotifications}
       onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       onOpenLogoutModal={handleLogoutRequest}
       onOpenSettingsModal={() => navigate('/settings')}
@@ -753,13 +774,19 @@ function AppContent() {
           streamRateMs={streamRateMs}
           onChangeStreamRate={setStreamRateMs}
           theme={theme}
+          notificationsEnabled={notificationsEnabled}
+          onToggleNotifications={handleToggleNotifications}
           onInjectAnomaly={handleInjectAnomaly}
           onResetSimulation={handleResetSimulation}
         />
       )}
 
       {/* Toast Stack for incoming Anomaly Toasts */}
-      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ToastStack 
+        toasts={toasts} 
+        onDismiss={dismissToast} 
+        onMuteAll={handleToggleNotifications} 
+      />
 
       {/* Confirmation Modal for Destructive Operations */}
       <ConfirmationModal
