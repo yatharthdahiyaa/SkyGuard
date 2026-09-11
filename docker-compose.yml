@@ -1,0 +1,116 @@
+# SkyGuard AI - Unified Multi-Container Operational Stack
+services:
+  # ---------------------------------------------------------------------------
+  # 1. TimescaleDB (PostgreSQL 15 + Time-Series Extension)
+  # ---------------------------------------------------------------------------
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: skyguard_timescaledb
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: skyguard
+      POSTGRES_USER: skyguard_admin
+      POSTGRES_PASSWORD: skyguard_secret
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyguard_admin -d skyguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - skyguard_net
+
+  # ---------------------------------------------------------------------------
+  # 2. Eclipse Mosquitto MQTT Message Broker
+  # ---------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: skyguard_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - skyguard_net
+
+  # ---------------------------------------------------------------------------
+  # 3. SkyGuard FastAPI Backend & ML Analytics Pipeline
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./skyguard_backend
+      dockerfile: Dockerfile
+    container_name: skyguard_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://skyguard_admin:skyguard_secret@timescaledb:5432/skyguard
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      HOST: 0.0.0.0
+      PORT: 8000
+    volumes:
+      - ./DATA:/app/DATA:ro
+    networks:
+      - skyguard_net
+
+  # ---------------------------------------------------------------------------
+  # 4. SkyGuard AI Operational Monitoring Dashboard (React + Vite + NGINX)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: ./Dashboard
+      dockerfile: Dockerfile
+    container_name: skyguard_dashboard
+    restart: unless-stopped
+    ports:
+      - "8501:80"
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - skyguard_net
+
+  # ---------------------------------------------------------------------------
+  # 5. High-Frequency Telemetry Stream Simulator
+  # ---------------------------------------------------------------------------
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: skyguard_simulator
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - mosquitto
+    volumes:
+      - ./DATA:/app/DATA:ro
+    environment:
+      BACKEND_URL: http://backend:8000
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      RATE_HZ: 5.0
+      LOOP: "true"
+      DATASET_PATH: /app/DATA/skyguard_groundtruth_benchmark.parquet
+    networks:
+      - skyguard_net
+
+networks:
+  skyguard_net:
+    driver: bridge
+
+volumes:
+  timescaledb_data:
+    driver: local

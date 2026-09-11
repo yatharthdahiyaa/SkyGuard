@@ -1,0 +1,10 @@
+{
+  "name": "skyguard-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix sih run dev",
+    "build": "npm --prefix sih run build",
+    "preview": "npm --prefix sih run preview"
+  }
+}
