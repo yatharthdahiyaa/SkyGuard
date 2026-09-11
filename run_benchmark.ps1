@@ -1,5 +1,6 @@
 # SkyGuard AI - Operational Benchmark Evaluation Suite (PowerShell)
 param (
+    [string]$Preset = "16k",
     [switch]$ForceRun,
     [string]$Benchmark = "DATA/skyguard_groundtruth_benchmark.parquet",
     [string]$OutputJson = "EVAL/skyguard_evaluation_report.json"
@@ -11,7 +12,7 @@ Write-Host "   India Meteorological Department (IMD) / MoES Compliance Check    
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-$cmdArgs = @("evaluate_harness.py", "--benchmark", $Benchmark, "--output-json", $OutputJson)
+$cmdArgs = @("evaluate_harness.py", "--preset", $Preset, "--benchmark", $Benchmark, "--output-json", $OutputJson)
 
 if ($ForceRun) {
     $cmdArgs += "--force-run"

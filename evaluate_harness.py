@@ -383,7 +383,18 @@ def main():
         action="store_true",
         help="Force re-running ML pipeline from scratch instead of loading precomputed stream"
     )
+    parser.add_argument(
+        "--preset",
+        choices=["default", "16k"],
+        default="default",
+        help="Use '16k' to run the 16,270-record full operational benchmark suite"
+    )
     args = parser.parse_args()
+
+    if args.preset == "16k":
+        from benchmark_score import main as run_16k_benchmark
+        run_16k_benchmark()
+        return
 
     # Step 1: Ingest benchmark and ML pipeline output
     print(f"\n[SkyGuard Harness] Loading and validating benchmark from: {args.benchmark}...")
