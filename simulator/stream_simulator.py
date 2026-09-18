@@ -25,6 +25,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SkyGuard.Simulator")
 
+# Ensure parent directory is in sys.path for backend imports
+_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
+try:
+    from skyguard_backend.database import INITIAL_STATIONS
+except ImportError:
+    INITIAL_STATIONS = []
+
 # Magnus parameters for edge screening
 MAGNUS_A = 17.67
 MAGNUS_B = 243.5
@@ -93,7 +103,8 @@ class TelemetrySimulator:
         mqtt_port: int = 1883,
         rate_hz: float = 5.0,
         loop: bool = True,
-        max_records: Optional[int] = None
+        max_records: Optional[int] = None,
+        live_time: bool = True,
     ):
         self.dataset_path = dataset_path
         self.backend_url = backend_url.rstrip("/")
@@ -102,6 +113,7 @@ class TelemetrySimulator:
         self.rate_hz = max(rate_hz, 0.1)
         self.loop = loop
         self.max_records = max_records
+        self.live_time = live_time
 
         self.mqtt_client = None
         self.http_session = requests.Session()
@@ -122,6 +134,105 @@ class TelemetrySimulator:
             logger.warning("Could not connect to MQTT (%s); fallback to REST: %s", self.mqtt_host, e)
             self.mqtt_client = None
 
+    def expand_to_full_network(self, df_base: pd.DataFrame) -> pd.DataFrame:
+        """
+        Synthesizes realistic, physically consistent mesoscale telemetry for all 46 IMD AWS stations
+        (23 North India + 23 South/Western India) across the entire benchmark time range.
+        Uses atmospheric lapse rates (-6.5°C/1000m), barometric hypsometric formulas, and
+        regional microclimatic gradients so that spatial IDW consensus reflects 20-22 true neighbors.
+        """
+        if not INITIAL_STATIONS:
+            return df_base
+
+        base_sids = set(df_base["station_id"].astype(str).unique())
+        extra_stations = [s for s in INITIAL_STATIONS if str(s["station_id"]) not in base_sids]
+
+        if not extra_stations:
+            return df_base
+
+        logger.info(
+            "Expanding simulation dataset: synthesizing mesoscale telemetry for %d additional stations across 46-station network...",
+            len(extra_stations),
+        )
+
+        timestamps = df_base["timestamp"].unique()
+        # Find anchor reference for South: Mumbai Airport 43003099999 or first available
+        mumbai_subset = df_base[df_base["station_id"].astype(str) == "43003099999"]
+        if mumbai_subset.empty:
+            mumbai_subset = df_base[df_base["station_id"].astype(str) == str(df_base["station_id"].iloc[0])]
+        mumbai_indexed = mumbai_subset.set_index("timestamp")
+
+        extra_rows = []
+        for ts in timestamps:
+            if ts not in mumbai_indexed.index:
+                continue
+            ref_row = mumbai_indexed.loc[ts]
+            ref_t = float(ref_row.get("T_clean", ref_row.get("T_obs", 31.0)))
+            ref_p = float(ref_row.get("P_clean", ref_row.get("P_obs", 1008.0)))
+            ref_rh = float(ref_row.get("RH_clean", ref_row.get("RH_obs", 70.0)))
+            ref_h = 11.3  # Mumbai Airport baseline elevation
+
+            for st in extra_stations:
+                sid = str(st["station_id"])
+                s_name = st["name"]
+                lat = float(st["latitude"])
+                lon = float(st["longitude"])
+                h = float(st["elevation_m"])
+                dh = h - ref_h
+
+                # Microscale hash perturbation for sensor individuality
+                hash_seed = (int(sid[-5:]) * 17 + int(h)) % 100
+                micro_t = ((hash_seed % 11) - 5) * 0.04
+                micro_p = ((hash_seed % 7) - 3) * 0.08
+                micro_rh = ((hash_seed % 13) - 6) * 0.15
+
+                if lat > 25.0:
+                    # ── North India Cluster (Delhi-NCR / Haryana / Punjab / UP / Rajasthan) ──
+                    # May pre-monsoon: ~4.5°C to 6.5°C warmer continental air mass, dry plains (20-45% RH)
+                    lapse_dh = h - 215.0  # Elevation delta from Delhi plains (~215m)
+                    t_north_base = ref_t + 5.2 - (0.0065 * lapse_dh) + micro_t
+                    p_north_base = 991.0 * ((1.0 - 0.0065 * lapse_dh / 305.0) ** 5.255) + micro_p
+                    rh_north_base = max(16.0, min(65.0, (ref_rh * 0.52) + micro_rh))
+
+                    t_val = round(t_north_base, 2)
+                    p_val = round(p_north_base, 2)
+                    rh_val = round(rh_north_base, 2)
+                else:
+                    # ── South & Western Peninsular Cluster (Konkan / Mumbai / Pune / Ghats) ──
+                    t_val = round(ref_t - (0.0065 * dh) + micro_t, 2)
+                    p_val = round(ref_p * ((1.0 - 0.0065 * dh / (ref_t + 273.15)) ** 5.255) + micro_p, 2)
+                    rh_val = round(max(20.0, min(98.0, ref_rh - (dh * 0.005) + micro_rh)), 2)
+
+                extra_rows.append({
+                    "timestamp": ts,
+                    "station_id": sid,
+                    "station_name": s_name,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "elevation_m": h,
+                    "T_clean": t_val,
+                    "P_clean": p_val,
+                    "RH_clean": rh_val,
+                    "T_obs": t_val,
+                    "P_obs": p_val,
+                    "RH_obs": rh_val,
+                    "is_fault": False,
+                    "fault_class": "NONE",
+                    "affected_channel": "NONE",
+                    "event_context": "MESOSCALE_SPATIAL_CLUSTER",
+                    "severity": "INFO"
+                })
+
+        df_extra = pd.DataFrame(extra_rows)
+        df_full = pd.concat([df_base, df_extra], ignore_index=True)
+        df_full.sort_values(by=["timestamp", "station_id"], inplace=True)
+        logger.info(
+            "Expanded dataset ready: %d total observations across %d stations (23 North + 23 South/West).",
+            len(df_full),
+            df_full["station_id"].nunique(),
+        )
+        return df_full
+
     def load_dataset(self) -> pd.DataFrame:
         candidates = [
             self.dataset_path,
@@ -137,9 +248,10 @@ class TelemetrySimulator:
             if path and os.path.exists(path):
                 logger.info("Loading benchmark dataset from: %s", path)
                 if path.endswith(".parquet"):
-                    return pd.read_parquet(path)
+                    df = pd.read_parquet(path)
                 else:
-                    return pd.read_csv(path)
+                    df = pd.read_csv(path)
+                return self.expand_to_full_network(df)
 
         raise FileNotFoundError(f"Benchmark dataset not found in candidates: {candidates}")
 
@@ -175,13 +287,16 @@ class TelemetrySimulator:
                 self.prev_samples[sid] = {"T": t_obs, "P": p_obs, "RH": rh_obs}
 
                 # Construct RFC 3339 timestamp
-                ts_val = row.get("timestamp")
-                if pd.isna(ts_val) or not ts_val:
+                if self.live_time:
                     ts_str = datetime.now(timezone.utc).isoformat()
-                elif isinstance(ts_val, pd.Timestamp):
-                    ts_str = ts_val.isoformat()
                 else:
-                    ts_str = str(ts_val)
+                    ts_val = row.get("timestamp")
+                    if pd.isna(ts_val) or not ts_val:
+                        ts_str = datetime.now(timezone.utc).isoformat()
+                    elif isinstance(ts_val, pd.Timestamp):
+                        ts_str = ts_val.isoformat()
+                    else:
+                        ts_str = str(ts_val)
 
                 payload = {
                     "station_id": sid,
@@ -212,8 +327,8 @@ class TelemetrySimulator:
                 total_streamed += 1
 
                 if total_streamed % 50 == 0:
-                    logger.info("Streamed %d records | Last: %s T=%.1f°C P=%.1f RH=%.1f | Edge: %s",
-                                total_streamed, sid, t_obs, p_obs, rh_obs, edge_meta["desc"])
+                    logger.info("Streamed %d records | Last: %s (%s) T=%.1f°C P=%.1f RH=%.1f | Edge: %s",
+                                total_streamed, sid, row.get("station_name", "AWS"), t_obs, p_obs, rh_obs, edge_meta["desc"])
 
                 if self.max_records and total_streamed >= self.max_records:
                     logger.info("Reached maximum records limit (%d). Terminating.", self.max_records)
@@ -235,9 +350,11 @@ def main():
     parser.add_argument("--backend-url", default=os.getenv("BACKEND_URL", "http://127.0.0.1:8000"))
     parser.add_argument("--mqtt-host", default=os.getenv("MQTT_HOST", None))
     parser.add_argument("--mqtt-port", type=int, default=int(os.getenv("MQTT_PORT", "1883")))
-    parser.add_argument("--rate-hz", type=float, default=float(os.getenv("RATE_HZ", "5.0")))
+    parser.add_argument("--rate-hz", type=float, default=float(os.getenv("RATE_HZ", "10.0")))
     parser.add_argument("--loop", action="store_true", default=os.getenv("LOOP", "false").lower() == "true")
     parser.add_argument("--max-records", type=int, default=None)
+    parser.add_argument("--live-time", action="store_true", default=True, help="Emit current UTC timestamps")
+    parser.add_argument("--no-live-time", dest="live_time", action="store_false", help="Preserve historical dataset timestamps")
 
     args = parser.parse_args()
 
@@ -248,7 +365,8 @@ def main():
         mqtt_port=args.mqtt_port,
         rate_hz=args.rate_hz,
         loop=args.loop,
-        max_records=args.max_records
+        max_records=args.max_records,
+        live_time=args.live_time,
     )
     simulator.run()
 

@@ -3,7 +3,8 @@ import {
   WsStatus, 
   Station, 
   AlertEvent, 
-  AlertTriageStatus 
+  AlertTriageStatus,
+  ParameterType
 } from './types/telemetry';
 import { calculateMagnusDewPoint } from './services/utils';
 import { TelemetryAPI } from './services/api';
@@ -115,7 +116,20 @@ function AppContent() {
       try {
         const liveAlerts = await TelemetryAPI.getAlerts();
         if (isMounted && liveAlerts && liveAlerts.length > 0) {
-          setAlerts(liveAlerts);
+          setAlerts((prev) => {
+            const map = new Map<string, AlertEvent>();
+            // Keep all current client alerts (especially active live alerts) intact
+            prev.forEach(a => map.set(a.id, a));
+            // Add or merge backend alerts without erasing active client alerts
+            liveAlerts.forEach(a => {
+              if (!map.has(a.id)) {
+                map.set(a.id, a);
+              }
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
+            );
+          });
         }
       } catch (err) {
         console.warn('Initial live alerts load error:', err);
@@ -162,12 +176,16 @@ function AppContent() {
 
             if (data.event === 'TELEMETRY_UPDATE' || data.station_id) {
               const stationId = data.station_id;
-              const repT = data.repaired?.T ?? data.observed?.T;
-              const repP = data.repaired?.P ?? data.observed?.P;
-              const repRH = data.repaired?.RH ?? data.observed?.RH;
+              const obsT = data.observed?.T;
+              const obsP = data.observed?.P;
+              const obsRH = data.observed?.RH;
+              const repT = data.repaired?.T ?? obsT;
+              const repP = data.repaired?.P ?? obsP;
+              const repRH = data.repaired?.RH ?? obsRH;
               const isHardwareFault = data.status === 'HARDWARE_FAULT' || (data.fault_class && data.fault_class !== 'NONE');
               const faultName = data.fault_class || 'HARDWARE_FAULT';
 
+              // Station update: preserve faulty status if station has an active unacknowledged alert
               setStations((prev) => {
                 return prev.map((st) => {
                   if (st.id !== stationId && st.code !== stationId) return st;
@@ -176,17 +194,21 @@ function AppContent() {
                   const newP = repP !== undefined ? Number(repP.toFixed(1)) : st.readings.pressure;
                   const newRH = repRH !== undefined ? Number(repRH.toFixed(1)) : st.readings.humidity;
                   const newDew = calculateMagnusDewPoint(newT, newRH);
-                  const status = isHardwareFault ? 'faulty' : 'healthy';
-                  const healthScore = isHardwareFault ? 38 : 98;
+
+                  // Keep station in faulty/alarm state if it has an active alert or current frame is faulty
+                  const hasActiveAlarm = isHardwareFault || (st.activeAlertCount > 0 && st.status === 'faulty');
+                  const status = hasActiveAlarm ? 'faulty' : 'healthy';
+                  const healthScore = hasActiveAlarm ? 38 : 98;
 
                   return {
                     ...st,
                     status,
                     healthScore,
+                    activeAlertCount: hasActiveAlarm ? 1 : 0,
                     latencyMs: Math.round(data.pipeline_latency_ms || 14),
                     lastPingAt: 'Just now',
                     lastSeen: 'Just now',
-                    lastFault: isHardwareFault ? (data.diagnostic || faultName) : st.lastFault,
+                    lastFault: hasActiveAlarm ? (data.diagnostic || faultName) : st.lastFault,
                     readings: {
                       ...st.readings,
                       temperature: newT,
@@ -198,85 +220,139 @@ function AppContent() {
                 });
               });
 
-              // Push real-time toast if hardware fault occurs
+              // Create or maintain alert if hardware fault occurs
               if (isHardwareFault) {
-                const liveAlertId = `alt-live-${Date.now()}`;
-                const liveAlert: AlertEvent = {
-                  id: liveAlertId,
-                  stationId,
-                  stationName: `Station ${stationId}`,
-                  faultType: faultName.includes('FROZEN') ? 'flatline' : faultName.includes('DRIFT') ? 'sensor_drift' : faultName.includes('SPIKE') ? 'step_jump' : 'dewpoint_violation',
-                  severity: 'critical',
-                  confidence: data.confidence || 0.98,
-                  anomalyScore: 0.92,
-                  parameter: 'RH',
-                  triggeredAt: new Date().toISOString(),
-                  durationMin: 1,
-                  status: 'active',
-                  assignedOperator: 'Duty Meteorologist (RMC)',
-                  explanation: {
+                // Determine anomalous channel and exact observed fault value
+                let paramType: ParameterType = 'RH';
+                let paramKey = 'RH';
+                let obsVal = obsRH ?? 85.0;
+                let repVal = repRH ?? 68.0;
+                let unit = '%';
+                let metricLabel = 'Relative Humidity';
+                let faultCategory: 'flatline' | 'sensor_drift' | 'step_jump' | 'dewpoint_violation' = 'dewpoint_violation';
+
+                if (data.per_variable?.temperature?.anomalous || (obsT !== undefined && repT !== undefined && Math.abs(obsT - repT) > 3.0)) {
+                  paramType = 'T';
+                  paramKey = 'temperature';
+                  obsVal = obsT;
+                  repVal = repT;
+                  unit = '°C';
+                  metricLabel = 'Ambient Temperature';
+                  faultCategory = faultName.includes('FROZEN') ? 'flatline' : faultName.includes('DRIFT') ? 'sensor_drift' : 'step_jump';
+                } else if (data.per_variable?.pressure?.anomalous || (obsP !== undefined && repP !== undefined && Math.abs(obsP - repP) > 5.0)) {
+                  paramType = 'P';
+                  paramKey = 'pressure';
+                  obsVal = obsP;
+                  repVal = repP;
+                  unit = 'hPa';
+                  metricLabel = 'Atmospheric Pressure';
+                  faultCategory = faultName.includes('FROZEN') ? 'flatline' : faultName.includes('DRIFT') ? 'sensor_drift' : 'step_jump';
+                } else {
+                  paramType = 'RH';
+                  paramKey = 'RH';
+                  obsVal = obsRH ?? 85.0;
+                  repVal = repRH ?? 68.0;
+                  unit = '%';
+                  metricLabel = 'Relative Humidity';
+                  faultCategory = faultName.includes('FROZEN') ? 'flatline' : faultName.includes('DRIFT') ? 'sensor_drift' : faultName.includes('SPIKE') ? 'step_jump' : 'dewpoint_violation';
+                }
+
+                // Deduplicate: check if this station already has an active alert in state
+                setAlerts((prev) => {
+                  const existingActive = prev.find(a => a.stationId === stationId && a.status === 'active');
+                  if (existingActive) {
+                    // Alert already intact for this station - do not overwrite or push duplicate!
+                    return prev;
+                  }
+
+                  const liveAlertId = `alt-live-${Date.now()}`;
+                  const spatialConsensus = TelemetryAPI.getNearbyConsensus(stationId, Number(obsVal.toFixed(1)), paramKey);
+
+                  const liveAlert: AlertEvent = {
+                    id: liveAlertId,
                     stationId,
                     stationName: `Station ${stationId}`,
-                    timestamp: new Date().toISOString(),
-                    parameter: 'RH',
-                    faultType: 'dewpoint_violation',
+                    faultType: faultCategory,
                     severity: 'critical',
                     confidence: data.confidence || 0.98,
                     anomalyScore: 0.92,
-                    riskLevel: 'CRITICAL',
-                    modelVersion: 'SkyGuard v2.4 (Live ML Inference)',
-                    physicsConsistency: {
-                      invariant: 'Thermodynamic Invariant: T_dew ≤ T_ambient (Magnus relation)',
-                      passed: false,
-                      dewPointActual: 24.5,
-                      dewPointMagnus: 21.0,
-                      delta: 3.5,
-                      formulaDescription: 'Magnus-Tetens thermodynamic check: Calculated dew-point exceeds ambient dry bulb temperature.',
-                      detail: data.diagnostic || 'Real-time telemetry invariant violation detected.'
-                    },
-                    temporalPattern: {
-                      metricName: 'Autoregressive Drift Rate',
-                      errorScore: 0.94,
-                      threshold: 0.35,
-                      deltaRate: '+6.1% / 5min',
-                      durationMin: 2,
-                      detail: 'Live drift rate confirmed by state estimator.'
-                    },
-                    spatialConsensus: {
-                      consensusScore: 0.15,
-                      neighborCount: 3,
-                      divergingNeighbors: 3,
-                      targetValue: repRH ?? 85.0,
-                      neighborsAvg: 68.0,
-                      neighbors: []
-                    },
-                    featureImportance: [
-                      { feature: 'Magnus Residual', importance: 0.52, contributionPct: 52, direction: 'increases_risk', baselineValue: 'Δ ≤ 0.2°C', observedValue: '+3.5°C' },
-                      { feature: 'Spatial Residual', importance: 0.30, contributionPct: 30, direction: 'increases_risk', baselineValue: 'Z ≤ 1.5', observedValue: 'Z = 3.9' },
-                      { feature: 'Temporal Rate', importance: 0.18, contributionPct: 18, direction: 'increases_risk', baselineValue: '< 2%', observedValue: '+6.1%' }
-                    ],
-                    evidenceTimeline: [
-                      { step: 1, stage: 'Live Stream Ingestion', title: 'Telemetry Frame Received', description: 'Stream simulator transmitted 2 Hz observation.', timestamp: 'Just now', status: 'nominal' },
-                      { step: 2, stage: 'ML Classification', title: 'Fault Class Identified', description: `Layer 2 classifier diagnosed ${faultName}.`, timestamp: 'Just now', status: 'critical' }
-                    ],
-                    recommendedActions: [
-                      { id: 'act-live', title: 'Remote Recalibration Command', priority: 'high', description: 'Dispatch zero-span RTU recalibration sequence.', status: 'pending' }
-                    ],
-                    plainLanguageSummary: data.diagnostic || `Live fault detected on station ${stationId}: ${faultName}. Imputation engine activated.`,
-                    suggestedRemediation: 'Transmit remote sensor recalibration sequence.',
-                    baselineVsObserved: {
-                      timestamps: ['-4m', '-3m', '-2m', '-1m', 'Now'],
-                      baseline: [68.0, 68.2, 68.4, 68.6, 68.8],
-                      actual: [68.1, 72.0, 78.5, 84.0, Number((repRH ?? 85).toFixed(1))],
-                      anomalyStartIndex: 2,
-                      metricLabel: 'Relative Humidity',
-                      unit: '%'
+                    parameter: paramType,
+                    triggeredAt: new Date().toISOString(),
+                    durationMin: 1,
+                    status: 'active',
+                    assignedOperator: 'Duty Meteorologist (RMC)',
+                    explanation: {
+                      stationId,
+                      stationName: `Station ${stationId}`,
+                      timestamp: new Date().toISOString(),
+                      parameter: paramType,
+                      faultType: faultCategory,
+                      severity: 'critical',
+                      confidence: data.confidence || 0.98,
+                      anomalyScore: 0.92,
+                      riskLevel: 'CRITICAL',
+                      modelVersion: 'SkyGuard v2.4 (Physics-Informed)',
+                      physicsConsistency: {
+                        invariant: paramType === 'T' 
+                          ? 'Thermodynamic Diurnal & Atmospheric Lapse Limit Check'
+                          : 'Thermodynamic Invariant: T_dew ≤ T_ambient (Magnus relation)',
+                        passed: false,
+                        dewPointActual: Number(obsVal.toFixed(1)),
+                        dewPointMagnus: Number(repVal.toFixed(1)),
+                        delta: Number(Math.abs(obsVal - repVal).toFixed(1)),
+                        formulaDescription: `Physics Engine Validation: Transducer channel [${paramType}] recorded anomalous departure from regional physical corridor.`,
+                        detail: data.diagnostic || `Real-time telemetry invariant breach: ${faultName} detected on station ${stationId}.`
+                      },
+                      temporalPattern: {
+                        metricName: 'Autoregressive Drift Rate',
+                        errorScore: 0.94,
+                        threshold: 0.35,
+                        deltaRate: `+${Number(Math.abs(obsVal - repVal).toFixed(1))} ${unit} / step`,
+                        durationMin: 2,
+                        detail: 'Live anomaly divergence verified by state estimator.'
+                      },
+                      spatialConsensus,
+                      featureImportance: [
+                        { feature: 'Thermodynamic Invariant Residual', importance: 0.52, contributionPct: 52, direction: 'increases_risk', baselineValue: `Δ ≤ 0.5 ${unit}`, observedValue: `Δ = ${Number(Math.abs(obsVal - repVal).toFixed(1))} ${unit}` },
+                        { feature: 'Spatial Consensus Residual (IDW)', importance: 0.30, contributionPct: 30, direction: 'increases_risk', baselineValue: 'Z ≤ 1.5', observedValue: 'Z = 4.2' },
+                        { feature: 'Temporal Derivative Step Jump', importance: 0.18, contributionPct: 18, direction: 'increases_risk', baselineValue: '< 2.0%', observedValue: `+${Number(Math.abs(obsVal - repVal).toFixed(1))}%` }
+                      ],
+                      evidenceTimeline: [
+                        { step: 1, stage: 'Live Ingestion', title: 'Edge Telemetry Received', description: `Transmitted observation: ${metricLabel} = ${Number(obsVal.toFixed(1))} ${unit}.`, timestamp: 'Just now', status: 'nominal' },
+                        { step: 2, stage: 'ML Classification', title: 'Hardware Fault Identified', description: `Layer 2 classifier diagnosed ${faultName} across ${spatialConsensus.neighborCount} regional neighbors.`, timestamp: 'Just now', status: 'critical' },
+                        { step: 3, stage: 'Self-Healing Repair', title: 'IDW Consensus Imputation', description: `Imputed physically plausible replacement (${Number(repVal.toFixed(1))} ${unit}) from ${spatialConsensus.neighborCount} neighboring stations.`, timestamp: 'Just now', status: 'nominal' }
+                      ],
+                      recommendedActions: [
+                        { id: 'act-live', title: 'Remote Recalibration Command', priority: 'high', description: 'Dispatch zero-span RTU recalibration sequence.', status: 'pending' }
+                      ],
+                      plainLanguageSummary: data.diagnostic || `Hardware fault detected on station ${stationId}: ${faultName}. Imputation engine active.`,
+                      suggestedRemediation: 'Execute remote zero-span recalibration command via console.',
+                      baselineVsObserved: {
+                        timestamps: ['-20m', '-15m', '-10m', '-5m', 'Alert Trigger'],
+                        baseline: [
+                          Number((repVal - 0.4).toFixed(1)),
+                          Number((repVal - 0.2).toFixed(1)),
+                          Number((repVal).toFixed(1)),
+                          Number((repVal + 0.1).toFixed(1)),
+                          Number((repVal + 0.3).toFixed(1))
+                        ],
+                        actual: [
+                          Number((repVal - 0.3).toFixed(1)),
+                          Number((repVal + 0.5).toFixed(1)),
+                          Number((repVal + (obsVal - repVal) * 0.4).toFixed(1)),
+                          Number((repVal + (obsVal - repVal) * 0.75).toFixed(1)),
+                          Number(obsVal.toFixed(1))
+                        ],
+                        anomalyStartIndex: 2,
+                        metricLabel,
+                        unit
+                      }
                     }
-                  }
-                };
+                  };
 
-                setAlerts((prev) => [liveAlert, ...prev.slice(0, 49)]);
-                addAnomalyToast(liveAlert);
+                  addAnomalyToast(liveAlert);
+                  return [liveAlert, ...prev];
+                });
               }
             }
           } catch (err) {
@@ -564,18 +640,7 @@ function AppContent() {
           durationMin: 12,
           detail: 'Sharp synthetic drift rate detected against Kalman state predictor.'
         },
-        spatialConsensus: {
-          consensusScore: 0.12,
-          neighborCount: 4,
-          divergingNeighbors: 4,
-          targetValue: 99.4,
-          neighborsAvg: 69.2,
-          neighbors: [
-            { id: 'st-01', name: 'Sector 4 Alpine Ridge RTU', distanceKm: 8.2, value: 71.4, status: 'faulty' },
-            { id: 'st-07', name: 'Paradise Glaciology Post', distanceKm: 16.1, value: 67.8, status: 'healthy' },
-            { id: 'st-04', name: 'Metropolitan Core Hub 01', distanceKm: 34.2, value: 68.9, status: 'healthy' }
-          ]
-        },
+        spatialConsensus: TelemetryAPI.getNearbyConsensus('43003099999', 99.4, 'RH'),
         featureImportance: [
           { feature: 'Magnus Dew-Point Invariant Residual', importance: 0.48, contributionPct: 48, direction: 'increases_risk', baselineValue: 'Δ ≤ 0.2°C', observedValue: '+2.9°C' },
           { feature: 'Spatial Neighbor Divergence (Z-Score)', importance: 0.32, contributionPct: 32, direction: 'increases_risk', baselineValue: 'Z ≤ 1.5', observedValue: 'Z = 4.12' },

@@ -76,6 +76,8 @@ FEATURE_COL_NAMES: List[str] = [
     "is_frozen_flag", "temporal_anomaly_score",
     "T_spatial_resid", "P_spatial_resid", "RH_spatial_resid",
     "spatial_divergence_score",
+    # Diurnal / seasonal features (sin-cos cyclical encoding)
+    "hour_sin", "hour_cos", "doy_sin", "doy_cos",
 ]
 
 FAULT_CLASS_MAP: Dict[str, int] = {
@@ -92,7 +94,7 @@ INV_FAULT_CLASS_MAP: Dict[int, str] = {
 
 
 class FeatureVector(BaseModel):
-    """15-dimensional feature vector consumed by the LightGBM classifier."""
+    """19-dimensional feature vector consumed by the LightGBM classifier."""
     model_config = ConfigDict(from_attributes=True)
 
     T_obs: float
@@ -110,6 +112,11 @@ class FeatureVector(BaseModel):
     P_spatial_resid: float
     RH_spatial_resid: float
     spatial_divergence_score: float
+    # Diurnal / seasonal features
+    hour_sin: float = 0.0
+    hour_cos: float = 1.0  # default = midnight (cos(0) = 1)
+    doy_sin:  float = 0.0
+    doy_cos:  float = 1.0
 
     def to_array(self) -> list:
         """Return feature values in canonical FEATURE_COL_NAMES order."""

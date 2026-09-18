@@ -54,6 +54,69 @@ export const StationsView: React.FC<StationsViewProps> = ({
   }, [stations, searchQuery, statusFilter, regionFilter, faultFilter, minHealthScore]);
 
   const regions = Array.from(new Set(stations.map(s => s.region)));
+  const dataToExport = filteredStations.length > 0 ? filteredStations : stations;
+
+  const handleExportCSV = () => {
+    if (onExportStations) {
+      onExportStations();
+    }
+
+    const headers = [
+      'Station ID',
+      'WMO Code',
+      'Station Name',
+      'Sector',
+      'Region',
+      'Latitude',
+      'Longitude',
+      'Elevation (m AMSL)',
+      'Operational Status',
+      'Health Score',
+      'Temperature (°C)',
+      'Pressure (hPa)',
+      'Relative Humidity (%)',
+      'Dew Point (°C)',
+      'Model Confidence',
+      'Network Uptime (%)',
+      'Latency (ms)',
+      'Last Seen'
+    ];
+
+    const dataToExport = filteredStations.length > 0 ? filteredStations : stations;
+    const csvRows = [
+      headers.join(','),
+      ...dataToExport.map((s) => [
+        `"${s.id}"`,
+        `"${s.code}"`,
+        `"${s.name.replace(/"/g, '""')}"`,
+        `"${s.sector}"`,
+        `"${s.region}"`,
+        s.lat,
+        s.lng,
+        s.elevationM,
+        `"${s.status.toUpperCase()}"`,
+        s.healthScore,
+        s.readings.temperature,
+        s.readings.pressure,
+        s.readings.humidity,
+        s.readings.dewPoint,
+        s.modelConfidence,
+        s.uptimePct,
+        s.latencyMs,
+        `"${s.lastSeen}"`
+      ].join(','))
+    ];
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `imd_skyguard_46_stations_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="view-container stations-view-container font-mono">
@@ -69,10 +132,11 @@ export const StationsView: React.FC<StationsViewProps> = ({
         <div className="stations-header-actions">
           <button 
             className="btn-export-csv"
-            onClick={onExportStations}
+            onClick={handleExportCSV}
+            title="Download full CSV dataset for all registered IMD AWS stations"
           >
             <Download size={13} />
-            <span>EXPORT</span>
+            <span>EXPORT CSV ({dataToExport?.length || stations.length})</span>
           </button>
           <button 
             className="btn-primary-action font-mono"

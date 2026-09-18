@@ -80,22 +80,32 @@ def generate_diagnosis(
 
     # --- Frozen ---
     if fault_type in (FaultType.SENSOR_FROZEN, "SENSOR_FROZEN", "FROZEN"):
+        unc_T = (
+            f"{correction.uncertainty.temperature_c:.1f}"
+            if correction.uncertainty and correction.uncertainty.temperature_c is not None
+            else "N/A"
+        )
+        idw_T = f"IDW={correction.temperature_c:.1f}°C ±{unc_T}°C" if correction.temperature_c is not None else "no spatial correction available"
         return (
             f"{station_id} sensor flatline detected — T={T_obs:.1f}°C has not varied "
             f"beyond measurement noise over multiple consecutive observations. "
-            f"Temperature imputed from {neighbour_str} "
-            f"(IDW={correction.temperature_c:.1f}°C ±{correction.uncertainty.temperature_c if correction.uncertainty else 'N/A'}°C)."
+            f"Temperature imputed from {neighbour_str} ({idw_T})."
         )
 
     # --- Drift ---
     if fault_type in (FaultType.SENSOR_DRIFT, "SENSOR_DRIFT", "DRIFT"):
         slope = temporal.drift.slope_c_per_hr if temporal else 0.0
+        unc_T = (
+            f"{correction.uncertainty.temperature_c:.1f}"
+            if correction.uncertainty and correction.uncertainty.temperature_c is not None
+            else "N/A"
+        )
         return (
             f"{station_id} exhibits systematic calibration drift: T_obs diverging "
             f"from {neighbour_str} at {slope:+.2f}°C/hr "
             f"(cumulative residual={t_resid:+.1f}°C). "
             f"Temperature corrected via IDW to {correction.temperature_c:.1f}°C "
-            f"(±{correction.uncertainty.temperature_c if correction.uncertainty else 'N/A'}°C)."
+            f"(±{unc_T}°C)."
         ) if correction.temperature_c else (
             f"{station_id} exhibits systematic drift; no spatial correction available."
         )

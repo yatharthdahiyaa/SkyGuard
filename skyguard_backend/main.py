@@ -17,6 +17,7 @@ from skyguard_backend.config import settings
 from skyguard_backend.database import init_db, get_db
 from skyguard_backend.websocket_manager import manager
 from skyguard_backend.routers import telemetry, stations, alerts, websocket, evaluation
+from skyguard_backend.routers import health as health_router
 from skyguard_backend.mqtt_listener import start_mqtt_listener, stop_mqtt_listener
 
 # Configure logging
@@ -63,6 +64,7 @@ app.include_router(telemetry.router, prefix=settings.API_V1_STR)
 app.include_router(stations.router, prefix=settings.API_V1_STR)
 app.include_router(alerts.router, prefix=settings.API_V1_STR)
 app.include_router(evaluation.router, prefix=settings.API_V1_STR)
+app.include_router(health_router.router, prefix=settings.API_V1_STR)
 app.include_router(websocket.router)  # Mounted at /ws/live
 
 
@@ -88,6 +90,8 @@ def get_service_catalog():
             "alerts": f"{settings.API_V1_STR}/alerts",
             "telemetry_ingest": f"{settings.API_V1_STR}/telemetry/ingest",
             "telemetry_history": f"{settings.API_V1_STR}/telemetry/{{station_id}}",
+            "sensor_health_station": f"{settings.API_V1_STR}/health/station/{{station_id}}",
+            "sensor_health_network": f"{settings.API_V1_STR}/health/network",
             "evaluation_report": f"{settings.API_V1_STR}/evaluation/report",
             "websocket_live": "/ws/live"
         },

@@ -109,6 +109,40 @@ class Alert(Base):
     station = relationship("Station", back_populates="alerts")
 
 
+class SensorHealthRecord(Base):
+    """
+    Per-sensor health score record.
+    Stores a health score (0–100) for each channel of a station, computed from
+    the fraction of fault-free observations in a rolling time window.
+    A score of 100 means no faults detected; a score of 0 means all recent
+    observations were flagged as faulty.
+    """
+    __tablename__ = "sensor_health"
+
+    id          = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    timestamp   = Column(DateTime(timezone=True), nullable=False, index=True)
+    station_id  = Column(String(32), ForeignKey("stations.station_id"), nullable=False, index=True)
+
+    # Per-channel health scores (0–100)
+    health_T    = Column(Float, default=100.0)   # Temperature sensor health
+    health_P    = Column(Float, default=100.0)   # Pressure sensor health
+    health_RH   = Column(Float, default=100.0)   # Humidity sensor health
+    health_all  = Column(Float, default=100.0)   # Composite station health
+
+    # Observation counts used for computation
+    window_obs  = Column(Integer, default=0)     # Total observations in window
+    fault_T     = Column(Integer, default=0)     # Faults on temperature channel
+    fault_P     = Column(Integer, default=0)     # Faults on pressure channel
+    fault_RH    = Column(Integer, default=0)     # Faults on humidity channel
+
+    # Trend indicator: +ve = improving, -ve = degrading, 0 = stable
+    trend       = Column(Float, default=0.0)
+
+    __table_args__ = (
+        Index("ix_sensorhealth_station_ts", "station_id", "timestamp"),
+    )
+
+
 # =============================================================================
 # 2. PYDANTIC V2 SCHEMAS  (ConfigDict replaces deprecated inner Config class)
 # =============================================================================
@@ -146,6 +180,27 @@ class TelemetryIngestResponse(BaseModel):
     fault_type:     Optional[str] = None
     classification: Optional[str] = None
     is_fault:       Optional[bool] = None
+
+
+class SensorHealth(BaseModel):
+    """Per-channel health score for a single sensor."""
+    score: float = Field(..., ge=0.0, le=100.0, description="Health score 0–100")
+    fault_count: int = Field(default=0, description="Fault events in observation window")
+    window_obs:  int = Field(default=0, description="Total observations in window")
+    trend:       str = Field(default="STABLE", description="IMPROVING | STABLE | DEGRADING")
+
+
+class StationHealthResponse(BaseModel):
+    """Per-sensor health breakdown for a weather station."""
+    model_config = ConfigDict(from_attributes=True)
+
+    station_id:    str
+    timestamp:     datetime
+    composite:     float = Field(..., description="Composite station health 0–100")
+    temperature:   SensorHealth
+    pressure:      SensorHealth
+    humidity:      SensorHealth
+    window_hours:  int = Field(default=24, description="Observation window in hours")
 
 
 class StationResponse(BaseModel):

@@ -207,7 +207,7 @@ export const FeatureImportanceChart: React.FC<{ features: FeatureImportance[] }>
       <div className="subpanel-body">
         <div className="shap-feature-bars">
           {features.map((item, idx) => {
-            const widthPct = Math.round(item.importance * 100);
+            const widthPct = Math.min(100, Math.max(0, Math.round((item.importance ?? 0) * 100)));
             const isRisk = item.direction === 'increases_risk';
 
             return (

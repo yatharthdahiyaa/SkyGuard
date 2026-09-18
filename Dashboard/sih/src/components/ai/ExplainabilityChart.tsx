@@ -59,15 +59,15 @@ export const ExplainabilityChart: React.FC<ExplainabilityChartProps> = ({
                     </div>
                   </div>
 
-                  <div className="feature-contrib-bar-wrap">
+                    <div className="feature-contrib-bar-wrap">
                     <div className="feature-contrib-track">
                       <div
                         className={`feature-contrib-fill ${isRisk ? 'bar-risk' : 'bar-safe'}`}
-                        style={{ width: `${feat.contributionPct}%` }}
+                        style={{ width: `${Math.min(100, Math.max(0, feat.contributionPct || 0))}%` }}
                       />
                     </div>
                     <span className={`feat-score-pct ${isRisk ? 'text-critical font-bold' : 'text-emerald-400'}`}>
-                      +{feat.contributionPct}%
+                      +{Math.min(100, Math.max(0, feat.contributionPct || 0))}%
                     </span>
                   </div>
                 </div>
@@ -83,50 +83,113 @@ export const ExplainabilityChart: React.FC<ExplainabilityChartProps> = ({
           <div className="subpanel-header">
             <div className="subpanel-title">
               <Activity size={14} className="text-amber-400" />
-              <span>EXPECTED VS OBSERVED SIGNAL CORRIDOR</span>
+              <span>EXPECTED VS OBSERVED SIGNAL CORRIDOR ({baselineVsObserved.metricLabel.toUpperCase()})</span>
             </div>
             <div className="chart-legend-mini font-mono text-xs">
               <span className="legend-sample baseline-dashed" /> Expected Baseline
               <span className="legend-sample actual-solid" /> Actual Sensor Telemetry
-              <span className="legend-sample anomaly-box" /> Detection Trigger
+              <span className="legend-sample anomaly-box" /> Anomaly Region
             </div>
           </div>
 
           <div className="subpanel-body">
             <div className="baseline-chart-svg-wrap">
-              <svg viewBox="0 0 700 180" className="baseline-svg" preserveAspectRatio="none">
-                {/* Bounds */}
+              <svg viewBox="0 0 760 210" className="baseline-svg">
+                {/* Self-Contained Bounded Plot Corridor */}
                 {(() => {
-                  const all = [...baselineVsObserved.baseline, ...baselineVsObserved.actual];
-                  const min = Math.min(...all) * 0.9;
-                  const max = Math.max(...all) * 1.1;
-                  const toX = (i: number) => (i / (baselineVsObserved.timestamps.length - 1)) * 620 + 40;
-                  const toY = (v: number) => 160 - ((v - min) / (max - min || 1)) * 130 - 15;
+                  const all = [...baselineVsObserved.baseline, ...baselineVsObserved.actual].filter(n => typeof n === 'number' && !isNaN(n));
+                  if (all.length === 0) return null;
+                  const rawMin = Math.min(...all);
+                  const rawMax = Math.max(...all);
+                  const range = rawMax - rawMin;
+                  const pad = range > 0 ? range * 0.20 : Math.max(Math.abs(rawMin) * 0.15, 2);
+                  const min = rawMin - pad;
+                  const max = rawMax + pad;
+                  const span = max - min || 1;
+
+                  const plotLeft = 60;
+                  const plotRight = 720;
+                  const plotTop = 25;
+                  const plotBottom = 175;
+                  const plotWidth = plotRight - plotLeft;
+                  const plotHeight = plotBottom - plotTop;
+
+                  const numPoints = Math.max(1, (baselineVsObserved.timestamps.length || 1) - 1);
+                  const toX = (i: number) => {
+                    const norm = Math.max(0, Math.min(1, i / numPoints));
+                    return plotLeft + norm * plotWidth;
+                  };
+                  const toY = (v: number) => {
+                    const clamped = Math.max(min, Math.min(max, v));
+                    const norm = (clamped - min) / span;
+                    return plotBottom - norm * plotHeight;
+                  };
+
+                  const safeStartIndex = Math.max(0, Math.min(baselineVsObserved.anomalyStartIndex, baselineVsObserved.actual.length - 1));
+                  const triggerX = toX(safeStartIndex);
+                  const triggerVal = baselineVsObserved.actual[safeStartIndex] ?? rawMax;
+                  const triggerY = toY(triggerVal);
 
                   const baselinePath = baselineVsObserved.baseline.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(v)}`).join(' ');
                   const actualPath = baselineVsObserved.actual.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(v)}`).join(' ');
-                  const triggerIndex = baselineVsObserved.anomalyStartIndex;
+
+                  const boxWidth = Math.max(0, plotRight - triggerX);
+                  const textY = triggerY < 45 ? triggerY + 20 : triggerY - 12;
+                  const textX = Math.max(plotLeft + 45, Math.min(plotRight - 45, triggerX));
+
+                  const yTicks = [
+                    { val: max, y: plotTop },
+                    { val: (max + min) / 2, y: (plotTop + plotBottom) / 2 },
+                    { val: min, y: plotBottom }
+                  ];
 
                   return (
                     <>
+                      {/* Grid guidelines & Y-axis labels */}
+                      {yTicks.map((tick, idx) => (
+                        <g key={idx}>
+                          <line
+                            x1={plotLeft}
+                            y1={tick.y}
+                            x2={plotRight}
+                            y2={tick.y}
+                            stroke="rgba(0, 51, 102, 0.12)"
+                            strokeDasharray={idx === 1 ? "4 4" : "2 2"}
+                          />
+                          <text
+                            x={plotLeft - 8}
+                            y={tick.y + 4}
+                            textAnchor="end"
+                            fill="#64748b"
+                            fontSize="10"
+                            fontFamily="monospace"
+                          >
+                            {tick.val.toFixed(1)}{baselineVsObserved.unit}
+                          </text>
+                        </g>
+                      ))}
+
                       {/* Anomaly detection region box */}
-                      <rect
-                        x={toX(triggerIndex)}
-                        y={10}
-                        width={660 - toX(triggerIndex)}
-                        height={150}
-                        fill="rgba(239, 68, 68, 0.12)"
-                        stroke="var(--state-critical)"
-                        strokeDasharray="4 2"
-                      />
+                      {boxWidth > 0 && (
+                        <rect
+                          x={triggerX}
+                          y={plotTop - 5}
+                          width={boxWidth}
+                          height={plotHeight + 10}
+                          fill="rgba(239, 68, 68, 0.08)"
+                          stroke="rgba(239, 68, 68, 0.4)"
+                          strokeDasharray="4 2"
+                          rx="4"
+                        />
+                      )}
 
                       {/* Baseline Line (Dashed) */}
                       <path
                         d={baselinePath}
                         fill="none"
-                        stroke="var(--state-info)"
-                        strokeWidth="2"
-                        strokeDasharray="5 4"
+                        stroke="#0284c7"
+                        strokeWidth="2.5"
+                        strokeDasharray="6 4"
                       />
 
                       {/* Actual Telemetry Line (Solid) */}
@@ -137,18 +200,41 @@ export const ExplainabilityChart: React.FC<ExplainabilityChartProps> = ({
                         strokeWidth="2.5"
                       />
 
-                      {/* Detection Trigger Point */}
+                      {/* Data Points on Actual */}
+                      {baselineVsObserved.actual.map((v, i) => (
+                        <circle
+                          key={i}
+                          cx={toX(i)}
+                          cy={toY(v)}
+                          r={i === safeStartIndex ? "5" : "3.5"}
+                          fill={i >= safeStartIndex ? "var(--state-critical)" : "#0284c7"}
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                        />
+                      ))}
+
+                      {/* Detection Trigger Point Highlight */}
                       <circle
-                        cx={toX(triggerIndex)}
-                        cy={toY(baselineVsObserved.actual[triggerIndex])}
+                        cx={triggerX}
+                        cy={triggerY}
                         r="6"
                         fill="var(--state-critical)"
                         stroke="#ffffff"
-                        strokeWidth="2"
+                        strokeWidth="2.5"
+                      />
+                      <rect
+                        x={textX - 58}
+                        y={textY - 11}
+                        width="116"
+                        height="16"
+                        fill="#ffffff"
+                        stroke="var(--state-critical)"
+                        strokeWidth="1"
+                        rx="3"
                       />
                       <text
-                        x={toX(triggerIndex)}
-                        y={toY(baselineVsObserved.actual[triggerIndex]) - 14}
+                        x={textX}
+                        y={textY + 1}
                         textAnchor="middle"
                         fill="var(--state-critical)"
                         fontSize="9"
@@ -156,15 +242,25 @@ export const ExplainabilityChart: React.FC<ExplainabilityChartProps> = ({
                       >
                         ANOMALY TRIP POINT
                       </text>
+
+                      {/* Integrated X-axis Timestamps */}
+                      {baselineVsObserved.timestamps.map((t, idx) => (
+                        <text
+                          key={idx}
+                          x={toX(idx)}
+                          y="198"
+                          textAnchor="middle"
+                          fill="#64748b"
+                          fontSize="10"
+                          fontFamily="monospace"
+                        >
+                          {t}
+                        </text>
+                      ))}
                     </>
                   );
                 })()}
               </svg>
-            </div>
-            <div className="baseline-chart-footer text-muted">
-              {baselineVsObserved.timestamps.map((t, idx) => (
-                <span key={idx}>{t}</span>
-              ))}
             </div>
           </div>
         </div>

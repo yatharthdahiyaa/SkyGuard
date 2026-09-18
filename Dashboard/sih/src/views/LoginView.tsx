@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useRouter } from '../context/RouterContext';
-import { 
-  Cpu, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  ShieldCheck, 
-  ArrowRight, 
-  KeyRound, 
+import {
+  Radio,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  ArrowRight,
+  KeyRound,
   Activity,
   AlertCircle
 } from 'lucide-react';
@@ -19,8 +19,8 @@ interface LoginViewProps {
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const { navigate } = useRouter();
-  const [email, setEmail] = useState('operator@aether.io');
-  const [password, setPassword] = useState('••••••••••••');
+  const [email, setEmail] = useState('duty-officer@imd.gov.in');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +36,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setIsLoading(false);
       if (onLoginSuccess) onLoginSuccess();
       navigate('/');
-    }, 700);
+    }, 750);
   };
 
   const handleSsoLogin = () => {
@@ -46,159 +46,244 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setSsoLoading(false);
       if (onLoginSuccess) onLoginSuccess();
       navigate('/');
-    }, 900);
+    }, 950);
   };
 
   return (
-    <div className="login-page-container font-mono">
-      {/* Background Grid Accent */}
+    <div className="login-page-container">
+      {/* Animated background blobs */}
       <div className="login-bg-overlay" />
 
-      {/* Main Authentication Card */}
-      <div className="login-auth-card panel">
-        {/* Header Branding */}
+      {/* Main IMD Authentication Card */}
+      <div className="login-auth-card">
+
+        {/* IMD Brand Header */}
         <div className="login-header-brand">
-          <div className="brand-logo-cluster justify-center mb-2">
-            <div className="brand-icon-box p-2 bg-slate-900 border border-emerald-500/40 rounded-lg">
-              <Cpu size={28} className="text-emerald-400 animate-pulse" />
-            </div>
+          {/* IMD Logo mark */}
+          <div className="login-brand-icon-wrap">
+            <Radio size={30} style={{ color: '#ff9933' }} />
           </div>
-          <h1 className="login-title text-xl font-bold text-primary tracking-wider">AETHER</h1>
-          <p className="login-subtitle text-xs text-secondary mt-1">
-            INDUSTRIAL INTELLIGENCE MISSION CONTROL
+
+          {/* Title */}
+          <h1 className="login-title font-sans">IMD SKYGUARD</h1>
+          <div className="login-title-hindi font-sans">भारत मौसम विज्ञान विभाग</div>
+          <p className="login-subtitle font-mono">
+            AWS TELEMETRY OPERATIONS CONSOLE
           </p>
-          <div className="login-badge-strip mt-2">
-            <span className="badge-neutral text-xs">PACIFIC NORTHWEST TELEMETRY CLUSTER · v4.2.0-CORE</span>
+
+          {/* Official institution badge */}
+          <div className="login-badge-strip">
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                background: 'rgba(0, 51, 102, 0.07)',
+                border: '1px solid rgba(0, 78, 153, 0.2)',
+                borderRadius: '9999px',
+                fontSize: '10px',
+                fontWeight: 600,
+                color: '#004e99',
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em'
+              }}
+            >
+              <ShieldCheck size={12} />
+              Ministry of Earth Sciences · Govt. of India · SkyGuard v2.4
+            </span>
           </div>
         </div>
 
+        {/* Error Alert */}
         {error && (
-          <div className="login-error-alert badge-critical p-3 rounded text-xs flex items-center gap-2 mb-4">
+          <div
+            className="font-mono"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              background: 'rgba(220, 38, 38, 0.07)',
+              border: '1px solid rgba(220, 38, 38, 0.3)',
+              borderRadius: '10px',
+              color: '#dc2626',
+              fontSize: '11.5px',
+              marginBottom: '16px'
+            }}
+          >
             <AlertCircle size={14} />
             <span>{error}</span>
           </div>
         )}
 
         {/* Credentials Form */}
-        <form onSubmit={handleSubmit} className="login-form flex flex-col gap-4 mt-4">
-          <div className="form-group">
-            <label className="form-label text-xs text-secondary block mb-1">
-              OPERATOR IDENTIFIER / EMAIL
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Email / Operator ID */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label
+              className="font-mono"
+              style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', letterSpacing: '0.05em' }}
+            >
+              OPERATOR IDENTIFIER / IMD ID
             </label>
-            <div className="input-with-icon relative">
-              <Mail size={15} className="input-icon-left text-muted absolute left-3 top-3" />
+            <div className="login-input-wrapper">
+              <Mail size={15} className="login-input-icon" />
               <input
                 type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="operator@aether.io"
-                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded font-mono text-primary text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="duty-officer@imd.gov.in"
+                className="login-form-input font-mono"
               />
             </div>
           </div>
 
-          <div className="form-group">
-            <div className="flex items-center justify-between mb-1">
-              <label className="form-label text-xs text-secondary block">
-                SECURITY PASSPHRASE / KEY
-              </label>
-              <a 
-                href="#forgot" 
-                onClick={(e) => { e.preventDefault(); alert('Please contact Duty Systems Administrator (duty-ops@skyguard.gov.in) for credentials recovery.'); }}
-                className="text-xs text-emerald-400 hover:underline"
+          {/* Passphrase */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label
+                className="font-mono"
+                style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', letterSpacing: '0.05em' }}
               >
-                Forgot key?
+                SECURITY PASSPHRASE
+              </label>
+              <a
+                href="#forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('Contact the Duty Systems Administrator: duty-sysadmin@imd.gov.in for credential recovery.');
+                }}
+                style={{ fontSize: '11px', color: '#004e99', textDecoration: 'none', fontWeight: 600 }}
+              >
+                Forgot passphrase?
               </a>
             </div>
-            <div className="input-with-icon relative">
-              <Lock size={15} className="input-icon-left text-muted absolute left-3 top-3" />
+            <div className="login-input-wrapper">
+              <Lock size={15} className="login-input-icon" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-10 py-2 bg-slate-950 border border-slate-800 rounded font-mono text-primary text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Enter secure passphrase"
+                className="login-form-input font-mono"
+                style={{ paddingRight: '40px' }}
               />
               <button
                 type="button"
-                className="password-toggle-btn absolute right-3 top-3 text-muted hover:text-primary"
+                className="login-input-toggle"
                 onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? 'Hide passphrase' : 'Show passphrase'}
               >
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
           </div>
 
-          {/* Remember Me Checkbox */}
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
+          {/* Remember me */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <label
+              className="font-sans"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#334155' }}
+            >
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded bg-slate-900 border-slate-700 text-emerald-500"
+                style={{ accentColor: '#004e99', width: '14px', height: '14px' }}
               />
-              <span>Remember station session (12h)</span>
+              <span>Keep session active (12 hours)</span>
             </label>
-            <span className="text-xs text-muted">SEC-LEVEL 4</span>
+            <span
+              className="font-mono"
+              style={{
+                fontSize: '9.5px',
+                padding: '2px 7px',
+                background: 'rgba(0, 78, 153, 0.07)',
+                border: '1px solid rgba(0, 78, 153, 0.2)',
+                borderRadius: '4px',
+                color: '#004e99',
+                fontWeight: 700
+              }}
+            >
+              SEC-LEVEL 4
+            </span>
           </div>
 
-          {/* Primary Submit Button */}
+          {/* Primary login button */}
           <button
             type="submit"
             disabled={isLoading}
-            className="btn-primary w-full py-2.5 rounded text-sm font-bold flex items-center justify-center gap-2 mt-2"
+            className="login-submit-btn font-sans"
           >
             {isLoading ? (
               <>
-                <Activity size={16} className="animate-spin text-primary" />
-                <span>AUTHENTICATING TELEMETRY SESSION...</span>
+                <Activity size={16} style={{ animation: 'spin-slow 1s linear infinite' }} />
+                <span>AUTHENTICATING SESSION...</span>
               </>
             ) : (
               <>
-                <span>ACCESS MISSION CONTROL</span>
-                <ArrowRight size={15} />
+                <span>ACCESS IMD SKYGUARD</span>
+                <ArrowRight size={16} />
               </>
             )}
           </button>
 
-          <div className="divider-or-row flex items-center gap-3 my-1">
-            <div className="h-px bg-slate-800 flex-1" />
-            <span className="text-xs text-muted">OR</span>
-            <div className="h-px bg-slate-800 flex-1" />
+          {/* OR divider */}
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+          >
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            <span className="font-mono" style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>OR</span>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
           </div>
 
-          {/* Industrial SSO Button */}
+          {/* IMD LDAP / eGov SSO */}
           <button
             type="button"
             disabled={ssoLoading}
             onClick={handleSsoLogin}
-            className="btn-secondary w-full py-2 rounded text-xs flex items-center justify-center gap-2 border border-slate-800 hover:border-slate-600"
+            className="login-sso-btn font-mono"
           >
             {ssoLoading ? (
               <>
-                <Activity size={14} className="animate-spin" />
-                <span>CONNECTING SAML IDENTITY PROVIDER...</span>
+                <Activity size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />
+                <span>CONNECTING TO eGov PORTAL...</span>
               </>
             ) : (
               <>
-                <KeyRound size={14} className="text-blue-400" />
-                <span>SIGN IN WITH INDUSTRIAL SSO (SAML 2.0)</span>
+                <KeyRound size={14} style={{ color: '#004e99' }} />
+                <span>SIGN IN WITH IMD LDAP / eGov PORTAL</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Card Footer System Status */}
-        <div className="login-card-footer mt-6 pt-4 border-t border-slate-800/80 text-center">
-          <div className="flex items-center justify-center gap-2 text-xs text-muted">
-            <span className="status-dot healthy" />
-            <span>All systems operational · v4.2.0-core</span>
+        {/* Card Footer — System Status */}
+        <div className="login-card-footer font-sans">
+          <div
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '11.5px', color: '#64748b' }}
+          >
+            <span
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: '#138808',
+                display: 'inline-block',
+                boxShadow: '0 0 6px rgba(19, 136, 8, 0.6)'
+              }}
+            />
+            <span>All AWS nodes operational · SkyGuard v2.4</span>
           </div>
-          <div className="text-xs text-slate-600 mt-1">
-            Authorized telemetry engineering access only · NIST SP 800-82 Rev 3
+          <div
+            className="font-mono"
+            style={{ fontSize: '10px', color: '#94a3b8', marginTop: '6px', lineHeight: 1.4 }}
+          >
+            Authorized IMD personnel only · MEITY IT Act 2000 · CyberSuraksha compliant
           </div>
         </div>
       </div>

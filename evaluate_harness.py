@@ -392,9 +392,14 @@ def main():
     args = parser.parse_args()
 
     if args.preset == "16k":
-        from benchmark_score import main as run_16k_benchmark
-        run_16k_benchmark()
-        return
+        print(
+            "[SkyGuard Harness] The '16k' preset has been removed.\n"
+            "  To run a full benchmark, generate a larger dataset first:\n"
+            "    python DATA/data_pipeline_injector.py --days 60\n"
+            "  Then run:\n"
+            "    python evaluate_harness.py --force-run\n"
+        )
+        sys.exit(1)
 
     # Step 1: Ingest benchmark and ML pipeline output
     print(f"\n[SkyGuard Harness] Loading and validating benchmark from: {args.benchmark}...")

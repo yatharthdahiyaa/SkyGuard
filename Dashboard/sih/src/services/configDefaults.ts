@@ -39,28 +39,28 @@ export const PERMISSION_MATRIX: PermissionMatrixRow[] = [
 export const MODEL_BENCHMARKS: ModelBenchmark[] = [
   {
     version: 'v2.4-prod (SkyGuard Physics-Informed ML)',
-    name: 'Physics-Informed Ensemble (CNN + Spatial Consensus)',
+    name: 'Physics-Informed LightGBM (19 features, temporal split + spatial consensus)',
     isCurrent: true,
-    accuracy: 0.984,
-    precision: 0.981,
-    recall: 0.976,
-    f1Score: 0.978,
-    falsePositiveRate: 0.006,
-    falseNegativeRate: 0.024,
+    accuracy: 0.982,
+    precision: 0.854,
+    recall: 0.832,
+    f1Score: 0.842,
+    falsePositiveRate: 0.000,
+    falseNegativeRate: 0.018,
     avgConfidence: 0.984,
-    detectionLatencyMs: 11
+    detectionLatencyMs: 1
   },
   {
-    version: 'v2.3 (Legacy Decision Tree + Heuristics)',
-    name: 'Decision Tree + Climatological Bounds',
+    version: 'v1.0 (Rule-Based Threshold & Physical Invariants Baseline)',
+    name: 'Static Bounds + Magnus Invariant + Rolling Z-Score Baseline',
     isCurrent: false,
-    accuracy: 0.941,
-    precision: 0.958,
-    recall: 0.948,
-    f1Score: 0.953,
-    falsePositiveRate: 0.014,
-    falseNegativeRate: 0.052,
-    avgConfidence: 0.932,
-    detectionLatencyMs: 29
+    accuracy: 0.920,
+    precision: 0.190,
+    recall: 0.210,
+    f1Score: 0.200,
+    falsePositiveRate: 0.048,
+    falseNegativeRate: 0.790,
+    avgConfidence: 0.750,
+    detectionLatencyMs: 0.2
   }
 ];

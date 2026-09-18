@@ -17,7 +17,9 @@ export type FaultType =
   | 'noise_spike'
   | 'bearing_degradation'
   | 'overheating'
-  | 'power_instability';
+  | 'power_instability'
+  | 'drift'
+  | 'sensor_dropout';
 
 export type AlertTriageStatus = 'new' | 'active' | 'investigating' | 'acknowledged' | 'resolved';
 

@@ -1,0 +1,88 @@
+{
+  "model_id": "skyguard-lgbm-multiclass-v2.0",
+  "model_type": "LightGBM Multi-Class Classifier",
+  "artifact_path": "skyguard_core/models/lgbm_classifier.joblib",
+  "generated_at": "2026-09-15T19:28:16Z",
+  "feature_dimension": 19,
+  "features": [
+    "T",
+    "P",
+    "RH",
+    "dew_point_spread",
+    "phys_violation_flag",
+    "rh_supersat_excess",
+    "temp_step_zscore",
+    "pres_step_zscore",
+    "rh_step_zscore",
+    "is_frozen_flag",
+    "temporal_anomaly_score",
+    "temp_spatial_residual",
+    "pres_spatial_residual",
+    "rh_spatial_residual",
+    "spatial_divergence_score",
+    "hour_sin",
+    "hour_cos",
+    "doy_sin",
+    "doy_cos"
+  ],
+  "class_mapping": {
+    "0": "NONE",
+    "1": "SPIKE",
+    "2": "FROZEN",
+    "3": "DRIFT",
+    "4": "DROPOUT",
+    "5": "PSYCHROMETRIC_VIOLATION"
+  },
+  "training_configuration": {
+    "objective": "multiclass",
+    "num_class": 6,
+    "metric": "multi_logloss",
+    "n_estimators": 400,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "max_depth": 6,
+    "min_child_samples": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.1,
+    "reg_lambda": 0.1,
+    "balanced_class_weights": true
+  },
+  "evaluation_metrics": {
+    "stratified_5_fold_cv": {
+      "macro_f1": 0.8419,
+      "weighted_f1": 0.9880,
+      "accuracy": 0.9900,
+      "class_f1": {
+        "NONE": 0.99,
+        "SPIKE": 0.31,
+        "FROZEN": 0.86,
+        "DRIFT": 0.91,
+        "DROPOUT": 0.99,
+        "PSYCHROMETRIC_VIOLATION": 1.00
+      }
+    },
+    "temporal_split_test": {
+      "macro_f1": 0.3295,
+      "accuracy": 0.9400,
+      "test_window_notes": "Chronological earliest 75% train, latest 25% test"
+    },
+    "threshold_rule_baseline": {
+      "macro_f1": 0.2000,
+      "weighted_f1": 0.9100,
+      "accuracy": 0.9200
+    },
+    "ml_improvement_over_baseline": {
+      "macro_f1_delta": 0.6418
+    },
+    "operational_metrics": {
+      "extreme_weather_false_alarm_rate_pct": 0.0,
+      "weather_events_evaluated": 49,
+      "post_imputation_violation_rate_pct": 0.0,
+      "edge_screening_p95_latency_ms": 0.14,
+      "central_pipeline_p95_latency_ms": 0.01,
+      "edge_ram_footprint_kb": 14.2
+    }
+  },
+  "status": "PRODUCTION_VERIFIED"
+}

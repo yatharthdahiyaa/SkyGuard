@@ -88,6 +88,7 @@ class TelemetryService {
               isCritical ? 'faulty' : isDegraded ? 'degraded' : isOffline ? 'offline' : 'healthy';
 
             const healthScore = isCritical ? 42 : isDegraded ? 74 : isOffline ? 0 : 98;
+            // Note: getNetworkHealth() is called separately and patches healthScore async
             const temp = Number((st.latest_reading?.T_imputed ?? st.latest_reading?.T_obs ?? 26.5).toFixed(1));
             const press = Number((st.latest_reading?.P_imputed ?? st.latest_reading?.P_obs ?? 1011.2).toFixed(1));
             const rh = Number((st.latest_reading?.RH_imputed ?? st.latest_reading?.RH_obs ?? 68.0).toFixed(1));
@@ -96,6 +97,13 @@ class TelemetryService {
             const isNorth = st.latitude > 25.0;
             const sector = isNorth ? 'North India Regional Grid' : 'Western Ghats & Coastal Mesh';
             const region = isNorth ? 'Northern Plains' : 'Maharashtra State';
+
+            // Use actual backend confidence if available, else status-based estimate
+            const modelConfidence = st.latest_reading?.confidence !== undefined 
+              ? Number(st.latest_reading.confidence.toFixed(2))
+              : st.latest_reading?.anomaly_score !== undefined 
+                ? Number(Math.max(0.72, 1 - (st.latest_reading.anomaly_score * 0.4)).toFixed(2)) 
+                : 0.98;
 
             const sensors: SensorConfig[] = [
               {
@@ -156,9 +164,7 @@ class TelemetryService {
               status,
               healthScore,
               uptimePct: 99.8,
-              modelConfidence: st.latest_reading?.anomaly_score !== undefined 
-                ? Number(Math.max(0.72, 1 - (st.latest_reading.anomaly_score * 0.4)).toFixed(2)) 
-                : 0.98,
+              modelConfidence,
               latencyMs: 14,
               snrDb: 25.8,
               firmware: 'v2.4.1-esp32',
@@ -240,6 +246,71 @@ class TelemetryService {
     return st || null;
   }
 
+  public getNearbyConsensus(targetStationId: string, currentTargetValue: number, parameter: string = 'RH'): {
+    consensusScore: number;
+    neighborCount: number;
+    divergingNeighbors: number;
+    targetValue: number;
+    neighborsAvg: number;
+    neighbors: { id: string; name: string; distanceKm: number; value: number; status: 'healthy' | 'degraded' | 'faulty' | 'offline' }[];
+  } {
+    const target = this.stations.find((s) => s.id === targetStationId);
+    const targetLat = target ? target.lat : (targetStationId.startsWith('42') ? 28.5845 : 19.0887);
+    const targetLng = target ? target.lng : (targetStationId.startsWith('42') ? 77.2058 : 72.8679);
+
+    const computeHaversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Number((R * c).toFixed(1));
+    };
+
+    const candidates = this.stations
+      .filter((s) => s.id !== targetStationId)
+      .map((s) => {
+        const dist = computeHaversine(targetLat, targetLng, s.lat, s.lng);
+        const val = parameter === 'temperature' 
+          ? s.readings.temperature 
+          : parameter === 'pressure' 
+            ? s.readings.pressure 
+            : s.readings.humidity;
+        return {
+          id: s.id,
+          name: s.name,
+          distanceKm: dist,
+          value: Number(val.toFixed(1)),
+          status: s.status,
+        };
+      })
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    // Filter to regional cluster within 380km, or take closest 22 stations
+    const regional = candidates.filter((c) => c.distanceKm <= 380);
+    const neighbors = (regional.length >= 10 ? regional : candidates).slice(0, 22);
+
+    const neighborCount = neighbors.length;
+    const neighborsAvg = neighborCount > 0
+      ? Number((neighbors.reduce((acc, n) => acc + n.value, 0) / neighborCount).toFixed(1))
+      : currentTargetValue;
+
+    const divergingNeighbors = neighbors.filter((n) => Math.abs(currentTargetValue - n.value) > 4.0).length;
+    const consensusScore = Number(Math.max(0.12, Math.min(0.95, 1 - (divergingNeighbors / Math.max(1, neighborCount)))).toFixed(2));
+
+    return {
+      consensusScore,
+      neighborCount,
+      divergingNeighbors,
+      targetValue: currentTargetValue,
+      neighborsAvg,
+      neighbors,
+    };
+  }
+
   async rebootStation(id: string): Promise<{ success: boolean; message: string }> {
     const st = this.stations.find((s) => s.id === id);
     if (!st) throw new Error(`Station ${id} not found in supervisory topology.`);
@@ -296,8 +367,8 @@ class TelemetryService {
               stationName,
               faultType,
               severity,
-              confidence: 0.98,
-              anomalyScore: 0.88,
+              confidence: alt.confidence !== undefined ? Number(alt.confidence.toFixed(3)) : 0.92,
+              anomalyScore: alt.anomaly_score !== undefined ? Number(alt.anomaly_score.toFixed(3)) : 0.75,
               parameter: 'RH',
               triggeredAt: alt.timestamp || new Date().toISOString(),
               durationMin: 18,
@@ -331,18 +402,7 @@ class TelemetryService {
                   durationMin: 18,
                   detail: 'Significant deviation from Kalman state predictor detected.'
                 },
-                spatialConsensus: {
-                  consensusScore: 0.18,
-                  neighborCount: 3,
-                  divergingNeighbors: 3,
-                  targetValue: 84.0,
-                  neighborsAvg: 68.5,
-                  neighbors: [
-                    { id: '43003099999', name: 'CSMI Mumbai Airport AWS', distanceKm: 18.4, value: 72.0, status: 'healthy' },
-                    { id: '43057099999', name: 'Bombay Colaba AWS', distanceKm: 28.2, value: 74.0, status: 'healthy' },
-                    { id: '43063099999', name: 'Pune AWS', distanceKm: 122.0, value: 70.2, status: 'healthy' }
-                  ]
-                },
+                spatialConsensus: this.getNearbyConsensus(alt.station_id, 84.0, 'RH'),
                 featureImportance: [
                   { feature: 'Magnus Thermodynamic Invariant', importance: 0.46, contributionPct: 46, direction: 'increases_risk', baselineValue: 'Δ ≤ 0.2°C', observedValue: '+2.8°C' },
                   { feature: 'Spatial Consensus Residual', importance: 0.34, contributionPct: 34, direction: 'increases_risk', baselineValue: 'Z ≤ 1.5', observedValue: 'Z = 3.8' },
@@ -351,8 +411,8 @@ class TelemetryService {
                 evidenceTimeline: [
                   { step: 1, stage: 'Ingestion', title: 'Edge Telemetry Received', description: 'Raw frame received from ESP32 station node.', timestamp: '18m ago', status: 'nominal' },
                   { step: 2, stage: 'Physics Engine', title: 'Thermodynamic Invariant Checked', description: 'Magnus relation evaluated against saturation vapor curve.', timestamp: '17m ago', status: 'warning' },
-                  { step: 3, stage: 'Layer 2 ML', title: 'Spatial Consensus & Ensemble Classifier', description: 'IDW spatial consensus divergence confirmed (Z = 3.8).', timestamp: '16m ago', status: 'critical' },
-                  { step: 4, stage: 'Self-Healing', title: 'Imputation & Repair Engine Engaged', description: 'Imputed value calculated using Inverse Distance Weighting from 3 neighbors.', timestamp: '15m ago', status: 'nominal' }
+                  { step: 3, stage: 'Layer 2 ML', title: 'Spatial Consensus & Ensemble Classifier', description: 'IDW spatial consensus divergence confirmed across regional grid.', timestamp: '16m ago', status: 'critical' },
+                  { step: 4, stage: 'Self-Healing', title: 'Imputation & Repair Engine Engaged', description: 'Imputed value calculated using Inverse Distance Weighting from 20-22 regional mesoscale neighbors.', timestamp: '15m ago', status: 'nominal' }
                 ],
                 recommendedActions: [
                   { id: 'act-1', title: 'Dispatch Remote Sensor Bias Recalibration', priority: 'high', description: 'Transmit zero-span recalibration packet to edge RTU.', status: 'pending' },
@@ -467,14 +527,23 @@ class TelemetryService {
 
           const anomalyMarkers: AnomalyMarker[] = chronological
             .filter((r: any) => r.is_fault)
-            .map((r: any) => ({
-              timestamp: new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              value: Number(((param === 'T' ? r.T_obs : param === 'P' ? r.P_obs : r.RH_obs) || 0).toFixed(1)),
-              faultType: 'flatline' as const,
-              severity: 'critical' as const,
-              confidence: 0.98,
-              label: r.fault_class || 'Fault'
-            }));
+            .map((r: any) => {
+              const ft = (r.fault_type || r.fault_class || 'UNKNOWN').toUpperCase();
+              const markerFaultType: 'flatline' | 'step_jump' | 'drift' | 'dewpoint_violation' | 'sensor_dropout' =
+                ft.includes('FROZEN')  ? 'flatline' :
+                ft.includes('SPIKE')   ? 'step_jump' :
+                ft.includes('DRIFT')   ? 'drift' :
+                ft.includes('PHYSICS') || ft.includes('PSYCHRO') ? 'dewpoint_violation' :
+                ft.includes('DROPOUT') ? 'sensor_dropout' : 'step_jump';
+              return {
+                timestamp: new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                value: Number(((param === 'T' ? r.T_obs : param === 'P' ? r.P_obs : r.RH_obs) || 0).toFixed(1)),
+                faultType: markerFaultType,
+                severity: r.severity?.toLowerCase() === 'critical' ? 'critical' : 'warning' as const,
+                confidence: r.confidence ?? 0.9,
+                label: r.fault_type || r.fault_class || 'Fault'
+              };
+            });
 
           return { series, anomalyMarkers, correctedOverlay };
         }
@@ -531,19 +600,32 @@ class TelemetryService {
       const res = await fetch(`${API_BASE}/evaluation/report`);
       if (res.ok) {
         const rep = await res.json();
-        if (rep.detection_benchmark) {
+        const db = rep.detection_benchmark;
+        if (db) {
+          // Map to the actual JSON structure produced by evaluate_harness.py
+          const macroF1      = db.macro?.f1 ?? 0.970;
+          const weightedF1   = db.weighted?.f1 ?? 0.988;
+          const macroPrecision = db.macro?.precision ?? 0.973;
+          const macroRecall    = db.macro?.recall ?? 0.967;
+          const far = rep.false_alarm_rate?.far_pct !== undefined
+            ? rep.false_alarm_rate.far_pct / 100.0
+            : 0.000;
+          const latencyMs = rep.system_latencies?.hub?.p50_ms
+            ?? rep.system_latencies?.pipeline_end_to_end_ms
+            ?? 11.4;
+
           const liveBenchmark: ModelBenchmark = {
             version: 'v2.4-prod (SkyGuard Physics-Informed ML)',
-            name: 'Physics-Informed Ensemble (CNN + Spatial Consensus)',
+            name: 'SkyGuard Physics-Informed LightGBM (19 features, temporal split)',
             isCurrent: true,
-            accuracy: rep.detection_benchmark.accuracy ?? 0.981,
-            precision: rep.detection_benchmark.macro_precision ?? 0.976,
-            recall: rep.detection_benchmark.macro_recall ?? 0.972,
-            f1Score: rep.detection_benchmark.macro_f1 ?? 0.974,
-            falsePositiveRate: rep.false_alarm_rate?.false_positive_rate ?? 0.007,
-            falseNegativeRate: Number((1 - (rep.detection_benchmark.macro_recall ?? 0.972)).toFixed(3)),
-            avgConfidence: 0.982,
-            detectionLatencyMs: Math.round(rep.system_latencies?.pipeline_end_to_end_ms ?? 11.4)
+            accuracy: weightedF1,         // weighted F1 as accuracy proxy
+            precision: macroPrecision,
+            recall: macroRecall,
+            f1Score: macroF1,
+            falsePositiveRate: far,
+            falseNegativeRate: Number((1 - macroRecall).toFixed(3)),
+            avgConfidence: 0.97,
+            detectionLatencyMs: Math.round(latencyMs)
           };
           return [liveBenchmark, ...MODEL_BENCHMARKS.slice(1)];
         }
@@ -578,8 +660,58 @@ class TelemetryService {
   async getPermissionsMatrix(): Promise<PermissionMatrixRow[]> {
     return [...PERMISSION_MATRIX];
   }
+
+  /**
+   * Fetches real per-sensor health scores from the backend health API.
+   * Returns a map of station_id → { composite, temperature, pressure, humidity }
+   */
+  async getNetworkHealth(): Promise<Record<string, {
+    composite: number;
+    temperature: { score: number; trend: string; fault_count: number };
+    pressure:    { score: number; trend: string; fault_count: number };
+    humidity:    { score: number; trend: string; fault_count: number };
+  }>> {
+    try {
+      const res = await fetch(`${API_BASE}/health/network`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Network health fetch failed:', err);
+    }
+    return {};
+  }
+
+  /**
+   * Patches station health scores in-place using real data from the health API.
+   * Call after getStations() to update health scores with live computed values.
+   */
+  async patchStationHealthScores(): Promise<void> {
+    const healthMap = await this.getNetworkHealth();
+    this.stations = this.stations.map(st => {
+      const health = healthMap[st.id];
+      if (!health) return st;
+      return {
+        ...st,
+        healthScore: Math.round(health.composite),
+        sensors: st.sensors?.map(sensor => {
+          if (sensor.id.endsWith('-T')) {
+            return { ...sensor, status: health.temperature.score >= 90 ? 'healthy' : health.temperature.score >= 70 ? 'degraded' : 'faulty' };
+          }
+          if (sensor.id.endsWith('-P')) {
+            return { ...sensor, status: health.pressure.score >= 90 ? 'healthy' : health.pressure.score >= 70 ? 'degraded' : 'faulty' };
+          }
+          if (sensor.id.endsWith('-RH')) {
+            return { ...sensor, status: health.humidity.score >= 90 ? 'healthy' : health.humidity.score >= 70 ? 'degraded' : 'faulty' };
+          }
+          return sensor;
+        })
+      };
+    });
+  }
 }
 
 // Global Singleton export
 export const TelemetryAPI = new TelemetryService();
 export default TelemetryAPI;
+

@@ -35,10 +35,37 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
   const [activeNoteAlertId, setActiveNoteAlertId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
 
-  const activeCount = alerts.filter(a => a.status === 'new' || a.status === 'investigating').length;
+  const activeCount = alerts.filter(a => a.status === 'active' || a.status === 'new' || a.status === 'investigating').length;
   const criticalCount = alerts.filter(a => a.severity === 'critical' && a.status !== 'resolved').length;
   const ackCount = alerts.filter(a => a.status === 'acknowledged').length;
   const resolvedCount = alerts.filter(a => a.status === 'resolved').length;
+
+  const handleExportAlertsCSV = () => {
+    const headers = ['Alert ID', 'Station ID', 'Station Name', 'Fault Type', 'Severity', 'Confidence', 'Anomaly Score', 'Parameter', 'Detected At', 'Status', 'Operator'];
+    const rows = (filteredAlerts.length > 0 ? filteredAlerts : alerts).map(a => [
+      `"${a.id}"`,
+      `"${a.stationId}"`,
+      `"${a.stationName.replace(/"/g, '""')}"`,
+      `"${a.faultType}"`,
+      `"${a.severity.toUpperCase()}"`,
+      a.confidence,
+      a.anomalyScore,
+      `"${a.parameter}"`,
+      `"${a.triggeredAt}"`,
+      `"${a.status.toUpperCase()}"`,
+      `"${a.assignedOperator}"`
+    ]);
+
+    const blob = new Blob([[headers.join(','), ...rows.map(r => r.join(','))].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `imd_skyguard_alerts_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const filteredAlerts = useMemo(() => {
     return alerts.filter(a => {
@@ -95,6 +122,15 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
             <span className="count-num font-bold">{resolvedCount}</span>
             <span className="count-lbl">RESOLVED</span>
           </div>
+          <button 
+            className="btn-export-csv"
+            onClick={handleExportAlertsCSV}
+            title="Download CSV log of operational alerts"
+            style={{ marginLeft: '8px' }}
+          >
+            <Download size={13} />
+            <span>EXPORT CSV</span>
+          </button>
         </div>
       </div>
 
@@ -135,6 +171,7 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
                 className="filter-select font-mono"
               >
                 <option value="all">ALL STAGES</option>
+                <option value="active">ACTIVE</option>
                 <option value="new">NEW</option>
                 <option value="investigating">INVESTIGATING</option>
                 <option value="acknowledged">ACKNOWLEDGED</option>

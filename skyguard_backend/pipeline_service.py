@@ -44,6 +44,7 @@ from skyguard_core.temporal import (
     isolation_forest_score,
 )
 
+from skyguard_backend import health_service
 from skyguard_backend.models import (
     Alert,
     Station,
@@ -78,53 +79,60 @@ class PipelineService:
         Returns SpatialConsensus with consensus_available=False (never uses latitude)
         when no valid neighbours exist.
         """
-        q = await session.execute(
-            select(Station).where(Station.station_id != current_station.station_id)
-        )
-        all_stations: List[Station] = q.scalars().all()
-
-        if not all_stations:
-            return SpatialConsensus(consensus_available=False, neighbor_count=0)
-
-        window_start = target_timestamp - timedelta(minutes=60)
-        window_end = target_timestamp + timedelta(minutes=60)
-
-        neighbours: List[NeighborReading] = []
-        for nb in all_stations:
-            q_rec = await session.execute(
-                select(TelemetryRecord)
-                .where(TelemetryRecord.station_id == nb.station_id)
-                .where(TelemetryRecord.timestamp >= window_start)
-                .where(TelemetryRecord.timestamp <= window_end)
-                .order_by(desc(TelemetryRecord.timestamp))
-                .limit(1)
+        with session.no_autoflush:
+            q = await session.execute(
+                select(Station).where(Station.station_id != current_station.station_id)
             )
-            rec: Optional[TelemetryRecord] = q_rec.scalar_one_or_none()
+            all_stations: List[Station] = q.scalars().all()
 
-            if rec is None:
-                continue
-            if math.isnan(rec.T_obs) or rec.T_obs <= -990.0:
-                continue
+            if not all_stations:
+                return SpatialConsensus(consensus_available=False, neighbor_count=0)
 
-            # Use imputed value for faulty neighbours
-            t_use = rec.T_imputed if rec.is_fault else rec.T_obs
-            p_use = rec.P_imputed if rec.is_fault else rec.P_obs
-            rh_use = rec.RH_imputed if rec.is_fault else rec.RH_obs
+            window_start = target_timestamp - timedelta(minutes=60)
+            window_end = target_timestamp + timedelta(minutes=60)
 
-            dist = haversine_km(
-                current_station.latitude, current_station.longitude,
-                nb.latitude, nb.longitude,
-            )
+            neighbours: List[NeighborReading] = []
+            for nb in all_stations:
+                q_rec = await session.execute(
+                    select(TelemetryRecord)
+                    .where(TelemetryRecord.station_id == nb.station_id)
+                    .where(TelemetryRecord.timestamp >= window_start)
+                    .where(TelemetryRecord.timestamp <= window_end)
+                    .order_by(desc(TelemetryRecord.timestamp))
+                    .limit(1)
+                )
+                rec: Optional[TelemetryRecord] = q_rec.scalar_one_or_none()
 
-            neighbours.append(NeighborReading(
-                station_id=nb.station_id,
-                T=t_use,
-                P=p_use,
-                RH=rh_use,
-                distance_km=dist,
-            ))
+                if rec is None:
+                    continue
+                if math.isnan(rec.T_obs) or rec.T_obs <= -990.0:
+                    continue
 
-        return compute_idw_consensus(neighbours, obs_T=T_obs)
+                # Use imputed value for faulty neighbours
+                t_use = rec.T_imputed if rec.is_fault else rec.T_obs
+                p_use = rec.P_imputed if rec.is_fault else rec.P_obs
+                rh_use = rec.RH_imputed if rec.is_fault else rec.RH_obs
+
+                dist = haversine_km(
+                    current_station.latitude, current_station.longitude,
+                    nb.latitude, nb.longitude,
+                )
+
+                neighbours.append(NeighborReading(
+                    station_id=nb.station_id,
+                    T=t_use,
+                    P=p_use,
+                    RH=rh_use,
+                    distance_km=dist,
+                ))
+
+            # Sort neighbours by Haversine distance and take the 20-24 closest regional stations
+            neighbours.sort(key=lambda x: x.distance_km)
+            regional_neighbours = [nb for nb in neighbours if nb.distance_km <= 380.0][:24]
+            # Fallback to nearest available if in remote area
+            final_neighbours = regional_neighbours if len(regional_neighbours) >= 3 else neighbours[:24]
+
+            return compute_idw_consensus(final_neighbours, obs_T=T_obs)
 
     def _build_temporal_state(
         self,
@@ -213,8 +221,6 @@ class PipelineService:
             session.add(station)
             await session.flush()
             logger.info("Auto-registered new station: %s", sid)
-        else:
-            station.last_seen = ts
 
         # ── 2. Spatial consensus ─────────────────────────────────────────────
         spatial: SpatialConsensus = await self._load_spatial_consensus(
@@ -235,6 +241,7 @@ class PipelineService:
             spatial=spatial,
             temporal=temporal,
             edge_flag=edge_flag,
+            timestamp=ts,
         )
 
         # ── 5. Classification ────────────────────────────────────────────────
@@ -268,11 +275,21 @@ class PipelineService:
             except Exception as exc:
                 logger.debug("LightGBM inference error (using rule-based result): %s", exc)
 
-        # ── 6. Update station status ─────────────────────────────────────────
+        # ── 6. Update station status & last seen ─────────────────────────────
+        station.last_seen = ts
         if diagnosis.severity == "CRITICAL":
             station.status = "CRITICAL"
         elif diagnosis.severity == "WARNING":
             station.status = "DEGRADED"
+        elif station.status in ("CRITICAL", "DEGRADED"):
+            # Check if there are active unacknowledged alerts before clearing to HEALTHY
+            q_unack = await session.execute(
+                select(Alert.alert_id)
+                .where(Alert.station_id == sid, Alert.acknowledged == False)
+                .limit(1)
+            )
+            if q_unack.scalar_one_or_none() is None:
+                station.status = "HEALTHY"
         else:
             station.status = "HEALTHY"
 
@@ -326,7 +343,30 @@ class PipelineService:
         await session.commit()
         await session.refresh(rec)
 
-        # ── 9. WebSocket event packet ─────────────────────────────────────────
+        # ── 9. Update per-sensor health scores ───────────────────────────────
+        affected_channels = []
+        if diagnosis.per_variable:
+            if diagnosis.per_variable.temperature.anomalous:
+                affected_channels.append("T")
+            if diagnosis.per_variable.pressure.anomalous:
+                affected_channels.append("P")
+            if diagnosis.per_variable.humidity.anomalous:
+                affected_channels.append("RH")
+        if not affected_channels and diagnosis.is_fault:
+            affected_channels = ["T"]
+
+        health_service.record_observation(
+            station_id=sid,
+            ts=ts,
+            fault_type=diagnosis.fault_type,
+            severity=diagnosis.severity,
+            is_fault=diagnosis.is_fault,
+            channels=affected_channels,
+        )
+        health_snapshot = health_service.compute_health(sid)
+        health_service.record_health_snapshot(sid)
+
+        # ── 10. WebSocket event packet ────────────────────────────────────────
         ws_packet: Dict[str, Any] = {
             "event": "TELEMETRY_UPDATE",
             "station_id": sid,
@@ -348,6 +388,14 @@ class PipelineService:
             "evidence": diagnosis.evidence.model_dump(),
             "correction": corr.model_dump(),
             "per_variable": diagnosis.per_variable.model_dump(),
+            # Real-time per-sensor health scores
+            "sensor_health": {
+                "composite": health_snapshot.composite,
+                "temperature": health_snapshot.temperature.model_dump(),
+                "pressure":    health_snapshot.pressure.model_dump(),
+                "humidity":    health_snapshot.humidity.model_dump(),
+                "window_hours": health_snapshot.window_hours,
+            },
         }
 
         return rec, alert_obj, ws_packet

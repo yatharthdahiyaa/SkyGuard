@@ -275,77 +275,83 @@ export const AppShell: React.FC<AppShellProps> = ({
                 {notificationsEnabled && totalAlertsCount > 0 && <span className="notification-counter-dot" />}
               </button>
 
-              {notificationsOpen && (
-                <div className="header-dropdown-menu panel font-mono">
-                  <div className="dropdown-header flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span>TELEMETRY BUS ({totalAlertsCount})</span>
-                      {!notificationsEnabled && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 font-bold">
-                          MUTED
-                        </span>
-                      )}
-                    </div>
-                    <button onClick={() => setNotificationsOpen(false)} className="close-dropdown-btn">
-                      <X size={13} />
-                    </button>
-                  </div>
-
-                  {/* Master Notification Toggle Strip */}
-                  <div className="px-3 py-2 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      {notificationsEnabled ? (
-                        <Bell size={13} className="text-emerald-400 flex-shrink-0" />
-                      ) : (
-                        <BellOff size={13} className="text-amber-400 flex-shrink-0" />
-                      )}
-                      <div>
-                        <div className="text-[11px] font-bold text-slate-200">
-                          {notificationsEnabled ? 'Live Toasts Active' : 'Live Toasts Muted'}
+                  {notificationsOpen && (
+                    <div className="header-dropdown-menu panel font-mono notification-dropdown-imd">
+                      <div className="dropdown-header flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span>TELEMETRY BUS ({totalAlertsCount})</span>
+                          {!notificationsEnabled && (
+                            <span
+                              style={{
+                                fontSize: '9.5px',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                background: 'var(--state-warning-bg)',
+                                border: '1px solid var(--state-warning-border)',
+                                color: 'var(--state-warning)',
+                                fontWeight: 700
+                              }}
+                            >
+                              MUTED
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[9px] text-slate-400">
-                          {notificationsEnabled ? 'Floating alerts enabled' : 'Popup toasts suppressed'}
+                        <button onClick={() => setNotificationsOpen(false)} className="close-dropdown-btn">
+                          <X size={13} />
+                        </button>
+                      </div>
+
+                      {/* Master Notification Toggle Strip */}
+                      <div className="notification-toggle-strip">
+                        <div className="flex items-center gap-2">
+                          {notificationsEnabled ? (
+                            <Bell size={13} style={{ color: 'var(--state-healthy)' }} />
+                          ) : (
+                            <BellOff size={13} style={{ color: 'var(--state-warning)' }} />
+                          )}
+                          <div>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {notificationsEnabled ? 'Live Toasts Active' : 'Live Toasts Muted'}
+                            </div>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                              {notificationsEnabled ? 'Floating alerts enabled' : 'Popup toasts suppressed'}
+                            </div>
+                          </div>
+                        </div>
+                        {onToggleNotifications && (
+                          <button
+                            onClick={onToggleNotifications}
+                            className={notificationsEnabled ? 'notif-toggle-btn-on' : 'notif-toggle-btn-off'}
+                            title={notificationsEnabled ? 'Turn off floating anomaly notifications' : 'Turn on floating anomaly notifications'}
+                          >
+                            {notificationsEnabled ? 'TURN OFF' : 'TURN ON'}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="dropdown-event-list">
+                        <div className="dropdown-event-item cursor-pointer" onClick={() => { navigate('/alerts/alt-8092'); setNotificationsOpen(false); }}>
+                          <div className="event-top">
+                            <span className="text-critical font-bold">ALT-8092 · DEWPOINT BREACH</span>
+                            <span className="text-muted">4m ago</span>
+                          </div>
+                          <p className="event-desc text-secondary">Sector 4 Alpine Ridge RTU violates Magnus equation.</p>
+                        </div>
+                        <div className="dropdown-event-item cursor-pointer" onClick={() => { navigate('/alerts/alt-8088'); setNotificationsOpen(false); }}>
+                          <div className="event-top">
+                            <span className="text-warning font-bold">ALT-8088 · TRANSDUCER FLATLINE</span>
+                            <span className="text-muted">38m ago</span>
+                          </div>
+                          <p className="event-desc text-secondary">Klickitat Hydro Gateway 0.00 hPa variance detected.</p>
                         </div>
                       </div>
-                    </div>
-                    {onToggleNotifications && (
-                      <button
-                        onClick={onToggleNotifications}
-                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
-                          notificationsEnabled 
-                            ? 'bg-rose-950/40 border-rose-500/50 text-rose-300 hover:bg-rose-900/60' 
-                            : 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
-                        }`}
-                        title={notificationsEnabled ? "Turn off floating anomaly notifications" : "Turn on floating anomaly notifications"}
-                      >
-                        {notificationsEnabled ? 'TURN OFF' : 'TURN ON'}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="dropdown-event-list">
-                    <div className="dropdown-event-item cursor-pointer" onClick={() => { navigate('/alerts/alt-8092'); setNotificationsOpen(false); }}>
-                      <div className="event-top">
-                        <span className="text-critical font-bold">ALT-8092 · DEWPOINT BREACH</span>
-                        <span className="text-muted">4m ago</span>
+                      <div className="dropdown-footer">
+                        <button onClick={() => { navigate('/alerts'); setNotificationsOpen(false); }} className="view-all-alerts-btn">
+                          OPEN INCIDENT TRIAGE →
+                        </button>
                       </div>
-                      <p className="event-desc text-secondary">Sector 4 Alpine Ridge RTU violates Magnus equation.</p>
                     </div>
-                    <div className="dropdown-event-item cursor-pointer" onClick={() => { navigate('/alerts/alt-8088'); setNotificationsOpen(false); }}>
-                      <div className="event-top">
-                        <span className="text-warning font-bold">ALT-8088 · TRANSDUCER FLATLINE</span>
-                        <span className="text-muted">38m ago</span>
-                      </div>
-                      <p className="event-desc text-secondary">Klickitat Hydro Gateway 0.00 hPa variance detected.</p>
-                    </div>
-                  </div>
-                  <div className="dropdown-footer">
-                    <button onClick={() => { navigate('/alerts'); setNotificationsOpen(false); }} className="view-all-alerts-btn">
-                      OPEN INCIDENT TRIAGE →
-                    </button>
-                  </div>
-                </div>
-              )}
+                  )}
             </div>
 
             {/* User Profile Quick Menu */}

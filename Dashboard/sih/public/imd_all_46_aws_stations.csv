@@ -1,0 +1,47 @@
+station_id,wmo_code,station_name,sector,region,latitude,longitude,elevation_m,operational_status,health_score,temperature_c,pressure_hpa,humidity_pct,dew_point_c,model_confidence,network_uptime_pct,latency_ms,last_seen
+42135099999,IMD-42135,Patiala Aviation & Agro AWS,North India Regional Grid,Northern Plains,30.3398,76.3869,251.0,HEALTHY,98,34.0,987.2,41.4,19.1,0.98,99.8,14,Just now
+42136099999,IMD-42136,Chandigarh Sub-Himalayan Airbase AWS,North India Regional Grid,Northern Plains,30.7333,76.7794,321.0,HEALTHY,98,33.7,979.4,40.8,18.5,0.98,99.8,14,Just now
+42137099999,IMD-42137,Karnal ICAR National Dairy AWS,North India Regional Grid,Northern Plains,29.6857,76.9905,253.0,HEALTHY,98,34.1,986.6,41.7,19.3,0.98,99.8,14,Just now
+42138099999,IMD-42138,Ambala Cantonment Synoptic AWS,North India Regional Grid,Northern Plains,30.3782,76.7767,264.0,HEALTHY,98,34.0,985.7,41.4,19.1,0.98,99.8,14,Just now
+42139099999,IMD-42139,Meerut Western UP Meteorological AWS,North India Regional Grid,Northern Plains,29.0167,77.7167,222.0,HEALTHY,98,34.4,990.4,41.0,19.2,0.98,99.8,14,Just now
+42140099999,IMD-42140,Muzaffarnagar Doab Agromet AWS,North India Regional Grid,Northern Plains,29.47,77.7,232.0,HEALTHY,98,34.2,989.0,40.5,18.9,0.98,99.8,14,Just now
+42141099999,IMD-42141,Moradabad Ramganga Basin AWS,North India Regional Grid,Northern Plains,28.8386,78.7733,193.0,HEALTHY,98,34.7,993.7,41.9,19.9,0.98,99.8,14,Just now
+42142099999,IMD-42142,Rohtak Agro-Climatic Station,North India Regional Grid,Northern Plains,28.8955,76.6066,220.0,HEALTHY,98,34.3,990.5,40.7,19.0,0.98,99.8,14,Just now
+42143099999,IMD-42143,Hisar HAU Arid Agromet AWS,North India Regional Grid,Northern Plains,29.1492,75.7217,215.0,HEALTHY,98,34.6,990.8,41.3,19.6,0.98,99.8,14,Just now
+42170099999,IMD-42170,Churu Thar Desert Boundary AWS,North India Regional Grid,Northern Plains,28.25,74.9167,291.0,HEALTHY,98,34.0,982.7,41.6,19.2,0.98,99.8,14,Just now
+42171099999,IMD-42171,Alwar Sariska Foothills AWS,North India Regional Grid,Northern Plains,27.553,76.6346,271.0,HEALTHY,98,34.2,985.0,40.5,18.9,0.98,99.8,14,Just now
+42181099999,IMD-42181,New Delhi Palam Airport AWS,North India Regional Grid,Northern Plains,28.5667,77.1,233.0,HEALTHY,98,34.3,988.9,40.7,19.0,0.98,99.8,14,Just now
+42182099999,IMD-42182,Delhi Safdarjung Regional Observatory,North India Regional Grid,Northern Plains,28.5845,77.2058,214.9,HEALTHY,98,34.6,991.2,41.1,19.5,0.98,99.8,14,Just now
+42183099999,IMD-42183,Lodhi Road IMD Headquarters AWS,North India Regional Grid,Northern Plains,28.5892,77.2215,211.0,HEALTHY,98,34.5,991.4,40.7,19.2,0.98,99.8,14,Just now
+42184099999,IMD-42184,Delhi University Northern Ridge AWS,North India Regional Grid,Northern Plains,28.6942,77.2106,230.0,HEALTHY,98,34.2,989.6,40.2,18.8,0.98,99.8,14,Just now
+42185099999,IMD-42185,Aya Nagar South Delhi AWS,North India Regional Grid,Northern Plains,28.472,77.128,260.0,HEALTHY,98,34.3,985.9,40.8,19.1,0.98,99.8,14,Just now
+42186099999,IMD-42186,Noida Sector 62 Urban AWS,North India Regional Grid,Northern Plains,28.625,77.365,200.0,HEALTHY,98,34.5,992.9,41.0,19.4,0.98,99.8,14,Just now
+42187099999,IMD-42187,Ghaziabad Industrial Zone AWS,North India Regional Grid,Northern Plains,28.6692,77.4538,214.0,HEALTHY,98,34.6,991.4,41.1,19.5,0.98,99.8,14,Just now
+42188099999,IMD-42188,Gurugram Cyber City AWS,North India Regional Grid,Northern Plains,28.4595,77.0266,225.0,HEALTHY,98,34.3,989.7,46.6,21.2,0.98,99.8,14,Just now
+42189099999,IMD-42189,Faridabad Badkhal Lake AWS,North India Regional Grid,Northern Plains,28.4089,77.3178,205.0,HEALTHY,98,34.3,992.2,41.7,19.4,0.98,99.8,14,Just now
+42260099999,IMD-42260,Agra Taj Weather Observatory,North India Regional Grid,Northern Plains,27.1558,77.9609,168.0,HEALTHY,98,34.8,996.1,42.0,20.0,0.98,99.8,14,Just now
+42261099999,IMD-42261,Aligarh Muslim University AWS,North India Regional Grid,Northern Plains,27.8974,78.088,178.0,HEALTHY,98,34.5,995.3,46.7,21.5,0.98,99.8,14,Just now
+42262099999,IMD-42262,Mathura Refinery Environmental AWS,North India Regional Grid,Northern Plains,27.4924,77.6737,174.0,HEALTHY,98,34.5,995.4,41.0,19.4,0.98,99.8,14,Just now
+42921099999,IMD-42921,Nasik City Agro-Meteorological AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.9667,73.8167,598.0,CRITICAL,42,24.5,1003.8,52.0,14.0,0.88,99.8,14,Just now
+42922099999,IMD-42922,Ozar Airport HAL Weather Station,Western Ghats & Coastal Mesh,Maharashtra State,20.1192,73.9136,580.0,DEGRADED,42,25.6,944.3,77.0,21.3,0.88,99.8,14,Just now
+42923099999,IMD-42923,Igatpuri Western Ghats Gateway AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.6978,73.5592,600.0,DEGRADED,42,25.4,942.6,76.0,20.9,0.88,99.8,14,Just now
+43003099999,IMD-43003,CSMI Mumbai International Airport AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.0887,72.8679,11.3,HEALTHY,98,29.2,1007.6,84.6,26.3,0.98,99.8,14,Just now
+43004099999,IMD-43004,Santacruz IMD Regional AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.076,72.8777,14.0,HEALTHY,98,29.1,1006.9,89.0,27.1,0.98,99.8,14,Just now
+43005099999,IMD-43005,Thane Ram Maruti AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.2183,72.9781,18.0,HEALTHY,98,29.0,1006.7,78.3,24.8,0.98,99.8,14,Just now
+43006099999,IMD-43006,Navi Mumbai Vashi AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.0771,72.9986,9.0,HEALTHY,98,29.2,1007.7,78.3,25.0,0.98,99.8,14,Just now
+43007099999,IMD-43007,Kalyan Dombivli Agro-Urban AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.2403,73.1305,16.0,HEALTHY,98,29.0,1006.9,79.3,25.0,0.98,99.8,14,Just now
+43057099999,IMD-43057,Bombay Colaba Coastal Observatory,Western Ghats & Coastal Mesh,Maharashtra State,18.9,72.8167,11.0,HEALTHY,98,31.0,1008.7,76.9,26.4,0.98,99.8,14,Just now
+43058099999,IMD-43058,Alibag Geomagnetic Coastal AWS,Western Ghats & Coastal Mesh,Maharashtra State,18.6414,72.8722,8.0,HEALTHY,98,28.9,1007.1,88.1,26.8,0.98,99.8,14,Just now
+43059099999,IMD-43059,Dahanu North Konkan Marine Station,Western Ghats & Coastal Mesh,Maharashtra State,19.97,72.73,5.0,CRITICAL,42,28.8,1007.8,89.6,27.0,0.88,99.8,14,Just now
+43060099999,IMD-43060,Ratnagiri South Konkan Observatory,Western Ghats & Coastal Mesh,Maharashtra State,16.9944,73.3,35.0,CRITICAL,42,28.9,1004.4,88.7,26.9,0.88,99.8,14,Just now
+43063099999,IMD-43063,Pune Shivajinagar Weather Station,Western Ghats & Coastal Mesh,Maharashtra State,18.5333,73.85,558.0,DEGRADED,42,25.6,1007.6,80.0,21.9,0.88,99.8,14,Just now
+43064099999,IMD-43064,Pune Pashan IITM Atmospheric AWS,Western Ghats & Coastal Mesh,Maharashtra State,18.5393,73.8055,570.0,CRITICAL,42,25.7,945.7,75.5,21.1,0.88,99.8,14,Just now
+43065099999,IMD-43065,Baramati Agro-Climatic Station,Western Ghats & Coastal Mesh,Maharashtra State,18.1519,74.5772,538.0,CRITICAL,42,25.8,948.2,86.7,23.4,0.88,99.8,14,Just now
+43066099999,IMD-43066,Mahabaleshwar Highland Observatory,Western Ghats & Coastal Mesh,Maharashtra State,17.9237,73.6586,1372.0,DEGRADED,42,20.0,861.7,81.7,16.7,0.88,99.8,14,Just now
+43067099999,IMD-43067,Satara Krishna Valley AWS,Western Ghats & Coastal Mesh,Maharashtra State,17.6805,73.9934,742.0,DEGRADED,42,24.4,927.2,76.3,19.9,0.88,99.8,14,Just now
+43068099999,IMD-43068,Kolhapur Shivaji University AWS,Western Ghats & Coastal Mesh,Maharashtra State,16.705,74.2433,569.0,DEGRADED,42,25.5,945.1,85.3,22.8,0.88,99.8,14,Just now
+43069099999,IMD-43069,Solapur Semi-Arid Plateau AWS,Western Ghats & Coastal Mesh,Maharashtra State,17.6599,75.9064,458.0,DEGRADED,42,26.4,958.0,76.2,21.9,0.88,99.8,14,Just now
+43070099999,IMD-43070,Ahmednagar Drought-Prone Area AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.0952,74.7496,649.0,CRITICAL,42,25.1,936.6,85.8,22.5,0.88,99.8,14,Just now
+43071099999,IMD-43071,Chhatrapati Sambhajinagar Regional AWS,Western Ghats & Coastal Mesh,Maharashtra State,19.8762,75.3433,568.0,CRITICAL,42,25.5,945.1,87.1,23.2,0.88,99.8,14,Just now
+43072099999,IMD-43072,Belgaum Sambra Peninsular AWS,Western Ghats & Coastal Mesh,Maharashtra State,15.8597,74.6186,762.0,DEGRADED,42,24.0,924.4,85.2,21.3,0.88,99.8,14,Just now
+43073099999,IMD-43073,Panaji Goa Coastal Marine AWS,Western Ghats & Coastal Mesh,Maharashtra State,15.4909,73.8278,15.0,CRITICAL,42,29.2,1006.3,89.1,27.2,0.88,99.8,14,Just now
