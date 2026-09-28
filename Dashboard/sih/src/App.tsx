@@ -157,7 +157,10 @@ function AppContent() {
     const connectWebSocket = () => {
       if (!isMounted) return;
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/live`;
+      const customWsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;
+      const wsUrl = customWsBase
+        ? `${customWsBase.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/live`
+        : `${wsProtocol}//${window.location.host}/ws/live`;
 
       setConnectionStatus('reconnecting');
       try {

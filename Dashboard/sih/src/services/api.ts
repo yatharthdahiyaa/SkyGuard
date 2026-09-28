@@ -57,7 +57,8 @@ export interface AnalyticsSummary {
   meanTimeBetweenFailuresHours: number;
 }
 
-const API_BASE = '/api/v1';
+const RAW_API_BASE = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = `${RAW_API_BASE}/api/v1`;
 
 /**
  * TelemetryAPI: Centralized live asynchronous service layer.

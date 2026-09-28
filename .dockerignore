@@ -1,0 +1,13 @@
+.git
+.gitignore
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+Dashboard/sih/node_modules
+Dashboard/sih/dist
+test.csv
+injection_validation_plot.png
+.vscode
+.idea

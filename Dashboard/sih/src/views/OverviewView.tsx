@@ -829,7 +829,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="text-xs font-bold text-red-700">{alert.stationId}</div>
-                    <div className="text-[10px] text-red-600 font-mono leading-tight truncate-multiline" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{alert.message}</div>
+                    <div className="text-[10px] text-red-600 font-mono leading-tight truncate-multiline" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{alert.explanation?.plainLanguageSummary || alert.faultType}</div>
                   </div>
                 </div>
               ))}

@@ -1,3 +1,14 @@
+---
+title: SkyGuard AI
+emoji: 🛰️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # SkyGuard AI
 
 <div align="center">
@@ -268,7 +279,20 @@ AWS/
 
 ## Quick Start Guide
 
-### 1-Click Stack Launcher (Recommended)
+### 🌐 Free Cloud Online Deployment (Render / Hugging Face)
+
+SkyGuard AI includes a unified, multi-stage production Docker container and Render Blueprint (`render.yaml`) that hosts the entire ecosystem (React 18 Dashboard + FastAPI ML Hub + Real-Time WebSocket Streaming + Autonomous 46-Station Telemetry Streamer) **100% free with zero configuration**.
+
+#### Deploy to Render (1-Click Free Hosting):
+1. Push your repository to GitHub.
+2. Sign in to [Render.com](https://render.com) using your GitHub account.
+3. Click **New +** → **Blueprint** → Select this repository.
+4. Render automatically detects [`render.yaml`](file:///e:/PROJECTS/SIH/2026/AWS/render.yaml) and provisions the Web Service on the Free plan.
+5. In ~3 minutes, your live public application will be available at `https://skyguard-ai.onrender.com`.
+
+---
+
+### 1-Click Local Stack Launcher (Recommended for Local Dev)
 
 If you are developing locally on Windows, SkyGuard AI provides unified one-click startup scripts that launch the **FastAPI Backend (port 8000)**, the **React Dashboard (port 5186)**, and the **46-Station Telemetry Simulator (2 Hz loop)**, opening the dashboard in your default browser:
 

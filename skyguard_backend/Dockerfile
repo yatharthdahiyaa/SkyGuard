@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY skyguard_backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Runtime Stage
@@ -27,8 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy installed Python packages from builder stage
 COPY --from=builder /install /usr/local
 
-# Copy application package
-COPY . /app/skyguard_backend
+# Copy application packages
+COPY skyguard_core /app/skyguard_core
+COPY skyguard_backend /app/skyguard_backend
 
 ENV PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1 \

@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     )
     LGBM_MODEL_PATH: Optional[str] = os.getenv("LGBM_MODEL_PATH", None)
 
+    # ── Cloud Online Deployment & Embedded Streamer ───────────────────────────
+    ENABLE_EMBEDDED_SIMULATOR: bool = os.getenv(
+        "ENABLE_EMBEDDED_SIMULATOR", "true"
+    ).lower() in ("true", "1", "yes")
+    EMBEDDED_SIMULATOR_RATE_HZ: float = float(os.getenv("EMBEDDED_SIMULATOR_RATE_HZ", "1.5"))
+    SERVE_STATIC_FRONTEND: bool = os.getenv(
+        "SERVE_STATIC_FRONTEND", "true"
+    ).lower() in ("true", "1", "yes")
+    FRONTEND_DIST_DIR: Optional[str] = os.getenv("FRONTEND_DIST_DIR", None)
+
     class Config:
         case_sensitive = True
 

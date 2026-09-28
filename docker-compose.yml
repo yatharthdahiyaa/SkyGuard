@@ -44,8 +44,8 @@ services:
   # ---------------------------------------------------------------------------
   backend:
     build:
-      context: ./skyguard_backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: skyguard_backend/Dockerfile
     container_name: skyguard_backend
     restart: unless-stopped
     ports:

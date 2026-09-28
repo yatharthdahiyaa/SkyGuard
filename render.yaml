@@ -1,0 +1,19 @@
+# Render Blueprint Specification for SkyGuard AI
+# Zero-cost production cloud deployment: https://render.com
+services:
+  - type: web
+    name: skyguard-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENABLE_EMBEDDED_SIMULATOR
+        value: "true"
+      - key: EMBEDDED_SIMULATOR_RATE_HZ
+        value: "1.5"
+      - key: SERVE_STATIC_FRONTEND
+        value: "true"
+      - key: DATABASE_URL
+        value: "sqlite+aiosqlite:///./skyguard_backend/skyguard.db"

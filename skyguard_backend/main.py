@@ -7,8 +7,11 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, Depends, status, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -19,6 +22,7 @@ from skyguard_backend.websocket_manager import manager
 from skyguard_backend.routers import telemetry, stations, alerts, websocket, evaluation
 from skyguard_backend.routers import health as health_router
 from skyguard_backend.mqtt_listener import start_mqtt_listener, stop_mqtt_listener
+from skyguard_backend.embedded_simulator import start_embedded_simulator, stop_embedded_simulator
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +33,22 @@ logging.basicConfig(
 logger = logging.getLogger("SkyGuard.Main")
 
 
+def get_frontend_dist_dir() -> Optional[Path]:
+    """Resolves production React dashboard dist directory if compiled."""
+    if not settings.SERVE_STATIC_FRONTEND:
+        return None
+    candidates = [
+        Path(settings.FRONTEND_DIST_DIR) if settings.FRONTEND_DIST_DIR else None,
+        Path(__file__).resolve().parent.parent / "Dashboard" / "sih" / "dist",
+        Path("/app/Dashboard/sih/dist"),
+        Path("Dashboard/sih/dist"),
+    ]
+    for c in candidates:
+        if c and c.exists() and (c / "index.html").exists():
+            return c
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown procedures."""
@@ -37,8 +57,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     # Start MQTT telemetry listener if broker configured
     start_mqtt_listener()
+    # Start embedded autonomous streamer for online cloud hosting
+    start_embedded_simulator()
     logger.info("System startup complete. Ready to ingest real-time AWS telemetry.")
     yield
+    stop_embedded_simulator()
     stop_mqtt_listener()
     logger.info("Shutting down %s...", settings.PROJECT_NAME)
 
@@ -58,6 +81,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount compiled static frontend assets if available
+frontend_dist = get_frontend_dist_dir()
+if frontend_dist:
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    data_dir = frontend_dist / "data"
+    if data_dir.exists():
+        app.mount("/data", StaticFiles(directory=str(data_dir)), name="data")
+    logger.info("Mounted static frontend build from: %s", frontend_dist)
 
 # Register API Routers
 app.include_router(telemetry.router, prefix=settings.API_V1_STR)
@@ -99,17 +133,8 @@ def get_service_catalog():
     }
 
 
-@app.get("/", tags=["Root"], summary="SkyGuard Meteorological Operations Root Endpoint")
-@app.get("/backend", tags=["Root"], include_in_schema=False)
-@app.get("/api", tags=["Root"], include_in_schema=False)
-@app.get(settings.API_V1_STR, tags=["Root"], include_in_schema=False)
-async def root_service_info(request: Request):
-    """Provides operational discovery status, documentation links, and active endpoint catalog."""
-    accept = request.headers.get("accept", "")
-    catalog = get_service_catalog()
-
-    if "text/html" in accept:
-        html_content = f"""<!DOCTYPE html>
+def render_discovery_html(catalog: dict) -> str:
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -141,8 +166,8 @@ async def root_service_info(request: Request):
         <p class="subtitle">Operational AWS Telemetry Ingestion, Layer 2 ML Analytics, Self-Healing Imputation, and Real-Time WebSocket Streaming Engine.</p>
         
         <div class="btn-grid">
+            <a href="/" class="btn btn-emerald">🖥️ Live Operations Dashboard</a>
             <a href="/docs" class="btn btn-primary" target="_blank">📘 Swagger API Docs</a>
-            <a href="http://localhost:5186" class="btn btn-emerald" target="_blank">🖥️ Frontend Dashboard</a>
             <a href="/api/v1/health" class="btn btn-secondary" target="_blank">🔍 Healthcheck</a>
             <a href="/api/v1/stations" class="btn btn-secondary" target="_blank">📡 Stations Catalog</a>
             <a href="/api/v1/alerts" class="btn btn-secondary" target="_blank">⚠️ Active Alerts</a>
@@ -153,8 +178,36 @@ async def root_service_info(request: Request):
     </div>
 </body>
 </html>"""
-        return HTMLResponse(content=html_content)
 
+
+@app.get("/", tags=["Root"], summary="SkyGuard Meteorological Operations Root Endpoint")
+async def root_service_info(request: Request):
+    """Provides operational dashboard or discovery status depending on accept header."""
+    dist = get_frontend_dist_dir()
+    accept = request.headers.get("accept", "").lower()
+
+    # Serve compiled React Dashboard unless client explicitly asks for JSON
+    if dist:
+        index_file = dist / "index.html"
+        if index_file.is_file() and ("application/json" not in accept or "text/html" in accept):
+            return FileResponse(str(index_file))
+
+    catalog = get_service_catalog()
+    if "text/html" in accept or "*/*" in accept or not accept:
+        return HTMLResponse(content=render_discovery_html(catalog))
+
+    return catalog
+
+
+@app.get("/backend", tags=["Root"], include_in_schema=False)
+@app.get("/api", tags=["Root"], include_in_schema=False)
+@app.get(settings.API_V1_STR, tags=["Root"], include_in_schema=False)
+async def api_catalog_endpoint(request: Request):
+    """Provides operational discovery status and active endpoint catalog."""
+    accept = request.headers.get("accept", "")
+    catalog = get_service_catalog()
+    if "text/html" in accept:
+        return HTMLResponse(content=render_discovery_html(catalog))
     return catalog
 
 
@@ -176,6 +229,25 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         "database": db_status,
         "active_ws_subscribers": manager.count()
     }
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_catch_all(request: Request, full_path: str):
+    """Single-Page Application catch-all route for React client-side routing."""
+    # Never intercept API, docs, or WebSocket paths
+    if full_path.startswith(("api/", "api", "ws/", "ws", "docs", "redoc", "openapi.json")):
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    dist = get_frontend_dist_dir()
+    if dist:
+        file_candidate = dist / full_path
+        if file_candidate.is_file():
+            return FileResponse(str(file_candidate))
+        index_file = dist / "index.html"
+        if index_file.is_file():
+            return FileResponse(str(index_file))
+
+    return Response(status_code=status.HTTP_404_NOT_FOUND)
 
 
 if __name__ == "__main__":
