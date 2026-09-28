@@ -28,6 +28,7 @@ import {
   Trash2, 
   Wifi, 
   Sparkles, 
+  Cloud,
   Sun, 
   Moon,
   AlertOctagon,
@@ -68,6 +69,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('thresholds');
   const [thresholds, setThresholds] = useState<ThresholdSetting[]>(THRESHOLD_SETTINGS);
   const [notificationRules, setNotificationRules] = useState<NotificationRule[]>(NOTIFICATION_RULES);
+
+  const [backendUrlInput, setBackendUrlInput] = useState<string>(() => {
+    return localStorage.getItem('skyguard_backend_url') || '';
+  });
+  const [backendSaved, setBackendSaved] = useState(false);
+
+  const handleSaveBackendUrl = () => {
+    const trimmed = backendUrlInput.trim().replace(/\/$/, '');
+    if (trimmed) {
+      localStorage.setItem('skyguard_backend_url', trimmed);
+    } else {
+      localStorage.removeItem('skyguard_backend_url');
+    }
+    setBackendSaved(true);
+    setTimeout(() => {
+      window.location.reload();
+    }, 600);
+  };
+
+  const handleClearBackendUrl = () => {
+    localStorage.removeItem('skyguard_backend_url');
+    setBackendUrlInput('');
+    window.location.reload();
+  };
   const [users, setUsers] = useState<UserAccount[]>(USER_ACCOUNTS);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
@@ -544,6 +569,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {activeTab === 'simulator' && (
         <div className="settings-tab-content">
           <div className="settings-cards-grid">
+            {/* Live Cloud Backend Configuration */}
+            <div className="settings-card panel">
+              <div className="panel-header">
+                <div className="panel-header-title">
+                  <Cloud size={14} className="text-cyan-400" />
+                  <span>CLOUD TELEMETRY BACKEND (RENDER / FASTAPI)</span>
+                </div>
+                <span className={backendUrlInput ? 'badge-primary' : 'badge-neutral'}>
+                  {backendUrlInput ? 'CUSTOM CLUSTER' : 'AUTONOMOUS (LOCAL)'}
+                </span>
+              </div>
+              <div className="panel-body">
+                <p className="settings-help-text text-secondary mb-3">
+                  Connect this dashboard directly to your live Render backend (e.g. <code>https://skyguard-ai.onrender.com</code>).
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={backendUrlInput}
+                    onChange={(e) => setBackendUrlInput(e.target.value)}
+                    placeholder="https://skyguard-ai.onrender.com"
+                    className="flex-1 bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs rounded text-slate-100 font-mono"
+                  />
+                  <button
+                    onClick={handleSaveBackendUrl}
+                    className="btn-primary text-xs px-3 py-1.5 rounded font-mono"
+                  >
+                    {backendSaved ? 'SAVED & RELOADING...' : 'CONNECT'}
+                  </button>
+                  {backendUrlInput && (
+                    <button
+                      onClick={handleClearBackendUrl}
+                      className="border border-slate-700 hover:bg-slate-800 text-xs px-3 py-1.5 rounded font-mono text-muted"
+                    >
+                      RESET
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Connection Simulator */}
             <div className="settings-card panel">
               <div className="panel-header">
