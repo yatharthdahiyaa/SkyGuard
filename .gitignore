@@ -39,11 +39,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 **/dist/
+!Dashboard/sih/dist/
+!Dashboard/sih/dist/**
 dist-ssr/
 *.local
 
 # Database & runtime files
 *.db
+*.db-*
 *.sqlite
 *.sqlite3
 *.log
