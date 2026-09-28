@@ -153,22 +153,39 @@ function AppContent() {
     let ws: WebSocket | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let isMounted = true;
+    let retryAttempts = 0;
 
     const connectWebSocket = () => {
       if (!isMounted) return;
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const customWsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;
+      const storedBackend = localStorage.getItem('skyguard_backend_url');
+      const customWsBase = storedBackend || import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;
+      
+      const isStaticHost = window.location.hostname.includes('hf.space') || 
+                           window.location.hostname.includes('github.io') ||
+                           window.location.hostname.includes('vercel.app');
+
+      // If hosted statically without an explicit backend and already attempted, seamlessly stay in autonomous mode
+      if (!customWsBase && isStaticHost && retryAttempts >= 1) {
+        startStaticSimulation();
+        return;
+      }
+
       const wsUrl = customWsBase
         ? `${customWsBase.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/live`
         : `${wsProtocol}//${window.location.host}/ws/live`;
 
-      setConnectionStatus('reconnecting');
+      if (customWsBase || retryAttempts > 0) {
+        setConnectionStatus('reconnecting');
+      }
       try {
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           if (!isMounted) return;
+          retryAttempts = 0;
           setConnectionStatus('live');
+          setLastMessageAt('Live WebSocket (2 Hz)');
           console.info('Connected to SkyGuard Live Telemetry Stream (2 Hz)');
         };
 
@@ -367,26 +384,43 @@ function AppContent() {
 
         ws.onclose = () => {
           if (!isMounted) return;
-          setConnectionStatus('reconnecting');
+          retryAttempts++;
           startStaticSimulation();
-          reconnectTimeout = setTimeout(connectWebSocket, 10000);
+          if (customWsBase) {
+            setConnectionStatus('reconnecting');
+            reconnectTimeout = setTimeout(connectWebSocket, 10000);
+          } else if (!isStaticHost && retryAttempts < 3) {
+            setConnectionStatus('reconnecting');
+            reconnectTimeout = setTimeout(connectWebSocket, 10000);
+          } else {
+            setConnectionStatus('live');
+          }
         };
 
         ws.onerror = () => {
+          retryAttempts++;
           startStaticSimulation();
           if (ws) ws.close();
         };
       } catch (err) {
         if (!isMounted) return;
+        retryAttempts++;
         startStaticSimulation();
-        reconnectTimeout = setTimeout(connectWebSocket, 10000);
+        if (customWsBase || (!isStaticHost && retryAttempts < 3)) {
+          setConnectionStatus('reconnecting');
+          reconnectTimeout = setTimeout(connectWebSocket, 10000);
+        } else {
+          setConnectionStatus('live');
+        }
       }
     };
 
     let staticSimTimer: ReturnType<typeof setInterval> | null = null;
     const startStaticSimulation = () => {
-      if (staticSimTimer || !isMounted) return;
+      if (!isMounted) return;
       setConnectionStatus('live');
+      if (staticSimTimer) return;
+      setLastMessageAt('Autonomous Stream (WMO-No. 8)');
       staticSimTimer = setInterval(() => {
         if (!isMounted) return;
         setStations((prev) => {
@@ -419,10 +453,10 @@ function AppContent() {
       }, 1500);
     };
 
-    // If no WS connection after 3s, activate static simulation
+    // If no WS connection after 2s, activate static simulation
     const initialSimTimeout = setTimeout(() => {
       startStaticSimulation();
-    }, 3000);
+    }, 2000);
 
     connectWebSocket();
 
@@ -816,7 +850,7 @@ function AppContent() {
       onOpenSettingsModal={() => navigate('/settings')}
     >
       {/* Route 1: / (Overview Dashboard) */}
-      {path === '/' && (
+      {(path === '/' || path === '/index.html' || !path) && (
         <OverviewView
           stations={stations}
           alerts={alerts}

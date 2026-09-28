@@ -39,7 +39,11 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (window.location.hash && window.location.hash.startsWith('#/')) {
       return window.location.hash.slice(1);
     }
-    return window.location.pathname || '/';
+    const raw = window.location.pathname || '/';
+    if (raw === '/index.html' || raw === '' || raw === '/index.htm') {
+      return '/';
+    }
+    return raw;
   };
 
   const [path, setPath] = useState<string>(getInitialPath);
