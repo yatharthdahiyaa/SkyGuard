@@ -16,4 +16,4 @@ services:
       - key: SERVE_STATIC_FRONTEND
         value: "true"
       - key: DATABASE_URL
-        value: "sqlite+aiosqlite:///./skyguard_backend/skyguard.db"
+        value: "sqlite+aiosqlite:////tmp/skyguard.db"

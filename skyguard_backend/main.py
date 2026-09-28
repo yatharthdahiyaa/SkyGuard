@@ -212,6 +212,8 @@ async def api_catalog_endpoint(request: Request):
 
 
 @app.get(f"{settings.API_V1_STR}/health", tags=["Health"], summary="System Readiness & Diagnostic Healthcheck")
+@app.get("/health", tags=["Health"], include_in_schema=False)
+@app.get("/healthz", tags=["Health"], include_in_schema=False)
 async def health_check(db: AsyncSession = Depends(get_db)):
     """Validates database connectivity, active WebSocket connections, and operational readiness."""
     db_status = "HEALTHY"
