@@ -77,6 +77,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       badgeType: 'critical'
     },
     { id: 'network-map' as ViewType, path: '/map', label: 'Network Map', icon: MapPin, badge: 'MESH' },
+    { id: 'sensor-health' as ViewType, path: '/sensor-health', label: 'Sensor Health', icon: Activity, badge: 'AWS' },
     { id: 'analytics' as ViewType, path: '/analytics', label: 'Analytics', icon: BarChart3, badge: null },
     { id: 'settings' as ViewType, path: '/settings', label: 'Settings', icon: SettingsIcon, badge: null },
   ];

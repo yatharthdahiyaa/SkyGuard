@@ -35,9 +35,9 @@ start http://localhost:5186
 echo.
 echo ======================================================================
 echo All SkyGuard AI operational services are running!
-echo • Dashboard: http://localhost:5186
-echo • Backend API: http://127.0.0.1:8000/docs
-echo • Active Telemetry Stream: Ingesting live records across 46 stations
+echo * Dashboard: http://localhost:5186
+echo * Backend API: http://127.0.0.1:8000/docs
+echo * Active Telemetry Stream: Ingesting live records across 46 stations
 echo ======================================================================
 echo.
 pause

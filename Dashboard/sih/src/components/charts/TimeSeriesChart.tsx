@@ -8,12 +8,12 @@ export interface MetricSeriesConfig {
   unit: string;
   color: string;
   points: TimeSeriesPoint[];
+  anomalyMarkers?: AnomalyMarker[];
 }
 
 interface TimeSeriesChartProps {
   seriesList: MetricSeriesConfig[];
   anomalyRegion?: { startIndex: number; endIndex: number; label: string; severity?: 'critical' | 'warning' };
-  anomalyMarkers?: AnomalyMarker[];
   height?: number;
   title?: string;
   allowMultiMetric?: boolean;
@@ -22,7 +22,6 @@ interface TimeSeriesChartProps {
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   seriesList,
   anomalyRegion,
-  anomalyMarkers = [],
   height = 260,
   title,
   allowMultiMetric = true
@@ -135,8 +134,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       </div>
 
       {/* Main SVG Plot */}
-      <div className="chart-svg-container" style={{ height }}>
-        <svg viewBox={`0 0 ${width} ${chartHeight}`} className="chart-svg" preserveAspectRatio="none">
+      <div className="chart-svg-container" style={{ height, overflow: 'hidden' }}>
+        <svg viewBox={`0 0 ${width} ${chartHeight}`} className="chart-svg" preserveAspectRatio="none" style={{ overflow: 'hidden' }}>
           {/* Horizontal Grid lines */}
           {[0.25, 0.5, 0.75].map((r, idx) => {
             const y = chartHeight * r;
@@ -198,21 +197,24 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               );
             })}
 
-          {/* Anomaly point flags */}
-          {anomalyMarkers.map((marker, mIdx) => {
-            const matchIndex = visiblePoints.findIndex(p => p.timestamp === marker.timestamp);
-            if (matchIndex === -1) return null;
-            const cx = toX(matchIndex);
-            const cy = toY(marker.value);
-            const markerColor = marker.severity === 'critical' ? 'var(--state-critical)' : 'var(--state-warning)';
+          {/* Anomaly point flags (only for active series) */}
+          {seriesList
+            .filter(s => activeMetricIds.includes(s.id))
+            .flatMap(s => s.anomalyMarkers || [])
+            .map((marker, mIdx) => {
+              const matchIndex = visiblePoints.findIndex(p => p.timestamp === marker.timestamp);
+              if (matchIndex === -1) return null;
+              const cx = toX(matchIndex);
+              const cy = toY(marker.value);
+              const markerColor = marker.severity === 'critical' ? 'var(--state-critical)' : 'var(--state-warning)';
 
-            return (
-              <g key={mIdx}>
-                <circle cx={cx} cy={cy} r="6" fill={markerColor} opacity="0.3" className="pulse-circle" />
-                <circle cx={cx} cy={cy} r="3.5" fill="#ffffff" stroke={markerColor} strokeWidth="2" />
-              </g>
-            );
-          })}
+              return (
+                <g key={mIdx}>
+                  <circle cx={cx} cy={cy} r="6" fill={markerColor} opacity="0.3" className="pulse-circle" />
+                  <circle cx={cx} cy={cy} r="3.5" fill="#ffffff" stroke={markerColor} strokeWidth="2" />
+                </g>
+              );
+            })}
 
           {/* Crosshair hover tracker */}
           {hoverIndex !== null && visiblePoints[hoverIndex] && (

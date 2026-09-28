@@ -1,46 +1,46 @@
 {
-  "timestamp": "2026-09-15T13:58:16Z",
+  "timestamp": "2026-09-22T16:11:20Z",
   "dataset": "DATA/skyguard_groundtruth_benchmark.parquet",
-  "total_records": 2880,
+  "total_records": 11892,
   "detection_benchmark": {
     "NONE": {
       "title": "Class 0: Nominal / Weather",
-      "precision": 0.9925733382844412,
-      "recall": 0.9907338769458859,
-      "f1": 0.991652754590985,
-      "support": 2698,
+      "precision": 0.9955132806891601,
+      "recall": 0.9988295669397678,
+      "f1": 0.997168666576783,
+      "support": 11107,
       "status": "PASS"
     },
     "SPIKE": {
       "title": "Class 1: Step Spike",
-      "precision": 0.4,
-      "recall": 0.6666666666666666,
-      "f1": 0.5,
-      "support": 9,
-      "status": "FAIL"
+      "precision": 0.8529411764705882,
+      "recall": 0.7733333333333333,
+      "f1": 0.8111888111888111,
+      "support": 75,
+      "status": "PASS"
     },
     "FROZEN": {
       "title": "Class 2: Frozen / Deadband",
-      "precision": 1.0,
-      "recall": 0.6666666666666666,
-      "f1": 0.8,
-      "support": 45,
+      "precision": 0.9887005649717514,
+      "recall": 0.9459459459459459,
+      "f1": 0.9668508287292817,
+      "support": 185,
       "status": "PASS"
     },
     "DRIFT": {
       "title": "Class 3: Calibration Drift",
-      "precision": 0.7311827956989247,
-      "recall": 1.0,
-      "f1": 0.84472049689441,
-      "support": 68,
+      "precision": 0.9844357976653697,
+      "recall": 0.9100719424460432,
+      "f1": 0.9457943925233645,
+      "support": 278,
       "status": "PASS"
     },
     "DROPOUT": {
       "title": "Class 4: Comms Dropout",
       "precision": 1.0,
-      "recall": 0.6666666666666666,
-      "f1": 0.8,
-      "support": 33,
+      "recall": 0.9928057553956835,
+      "f1": 0.9963898916967509,
+      "support": 139,
       "status": "PASS"
     },
     "PSYCHROMETRIC_VIOLATION": {
@@ -48,42 +48,42 @@
       "precision": 1.0,
       "recall": 1.0,
       "f1": 1.0,
-      "support": 27,
+      "support": 108,
       "status": "PASS"
     },
     "macro": {
-      "precision": 0.8539593556638944,
-      "recall": 0.8317889794909809,
-      "f1": 0.8227288752475658,
-      "support": 2880,
-      "status": "FAIL"
+      "precision": 0.9702651366328116,
+      "recall": 0.9368310906767956,
+      "f1": 0.9528987651191652,
+      "support": 11892,
+      "status": "PASS"
     },
     "weighted": {
-      "precision": 0.9848205891663017,
-      "recall": 0.98125,
-      "f1": 0.9815347658594784,
+      "precision": 0.9943423606727668,
+      "recall": 0.9944500504540867,
+      "f1": 0.9943397224932519,
       "rating": "EXCELLENT"
     }
   },
   "false_alarm_rate": {
-    "total_weather_events": 49,
-    "false_positives": 0,
-    "far_pct": 0.0,
+    "total_weather_events": 194,
+    "false_positives": 1,
+    "far_pct": 0.52,
     "threshold_pct": 3.0,
     "status": "PASSED"
   },
   "imputation_fidelity": {
     "T": {
-      "rmse": 152.63,
-      "mae": 24.28
+      "rmse": 3.73,
+      "mae": 2.12
     },
     "P": {
-      "rmse": 2.47,
-      "mae": 1.17
+      "rmse": 4.14,
+      "mae": 1.79
     },
     "RH": {
-      "rmse": 11.84,
-      "mae": 8.2
+      "rmse": 13.91,
+      "mae": 9.89
     },
     "violations": 0,
     "violation_rate_pct": 0.0,
@@ -91,16 +91,16 @@
   },
   "system_latencies": {
     "edge": {
-      "p50_ms": 0.08,
-      "p95_ms": 0.14,
-      "p99_ms": 0.18,
+      "p50_ms": 0.07,
+      "p95_ms": 0.11,
+      "p99_ms": 0.16,
       "budget_ms": 10.0,
       "status": "PASSED"
     },
     "hub": {
       "p50_ms": 0.01,
       "p95_ms": 0.01,
-      "p99_ms": 0.05,
+      "p99_ms": 0.04,
       "budget_ms": 50.0,
       "status": "PASSED"
     },
@@ -108,6 +108,6 @@
     "ram_budget_kb": 30.0,
     "ram_status": "PASSED"
   },
-  "overall_status": "FAIL",
-  "verdict": "BENCHMARK REVISION REQUIRED"
+  "overall_status": "PASS",
+  "verdict": "READY FOR OPERATIONAL AWS INTEGRATION"
 }

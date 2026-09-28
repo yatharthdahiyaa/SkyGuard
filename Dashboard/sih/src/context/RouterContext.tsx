@@ -72,6 +72,10 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const alertMatch = matchRoute('/alerts/:alertId', path);
     if (alertMatch.matches) return alertMatch.params;
 
+    // Check patterns like /sensor-health/:stationId
+    const sensorHealthMatch = matchRoute('/sensor-health/:stationId', path);
+    if (sensorHealthMatch.matches) return sensorHealthMatch.params;
+
     return {};
   }, [path]);
 

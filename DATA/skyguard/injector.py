@@ -451,16 +451,23 @@ class GroundTruthAnomalyInjector:
         st3 = station_ids[3 % n_st]
 
         # 1. Spikes (impulses of 1 to 2 timesteps across channels)
-        spike_schedule = [
-            (st0, t_min + timedelta(days=total_duration_days * 0.12, hours=3.0), "T", 1, 16.5),
-            (st1, t_min + timedelta(days=total_duration_days * 0.22, hours=14.0), "P", 2, -24.0),
-            (st2, t_min + timedelta(days=total_duration_days * 0.44, hours=8.0), "RH", 1, -55.0),
-            (st3, t_min + timedelta(days=total_duration_days * 0.65, hours=19.0), "T", 2, -18.0),
-            (st0, t_min + timedelta(days=total_duration_days * 0.82, hours=5.0), "P", 1, 26.0),
-            (st2, t_min + timedelta(days=total_duration_days * 0.92, hours=11.0), "RH", 2, 45.0),
-        ]
-        for s_id, s_time, ch, n_pts, mag in spike_schedule:
+        spike_budget_rows = int(target_fault_count * 0.10)
+        np.random.seed(42)
+        spikes_injected = 0
+        while spikes_injected < spike_budget_rows:
+            s_id = np.random.choice(station_ids)
+            # Pick a random time not in the first or last 5% of the dataset
+            rand_days = np.random.uniform(total_duration_days * 0.05, total_duration_days * 0.95)
+            s_time = t_min + timedelta(days=rand_days)
+            ch = np.random.choice(["T", "P", "RH"])
+            n_pts = np.random.choice([1, 2])
+            
+            if ch == "T": mag = np.random.choice([15.0, -18.0, 22.0, -25.0])
+            elif ch == "P": mag = np.random.choice([25.0, -30.0, 40.0, -45.0])
+            else: mag = np.random.choice([45.0, -55.0, 60.0, -70.0])
+            
             df = self.inject_spike(df, station_id=s_id, start_time=s_time, channel=ch, num_points=n_pts, magnitude=mag)
+            spikes_injected += n_pts
 
         # 2. Frozen (duration scaled to roughly 24% of budget across 3 episodes)
         freeze_budget_hours = ((target_fault_count * 0.24) / 3.0) * step_hours

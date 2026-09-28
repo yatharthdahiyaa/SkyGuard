@@ -269,4 +269,4 @@ export interface PermissionMatrixRow {
   manageUsers: boolean;
 }
 
-export type ViewType = 'overview' | 'stations' | 'alerts' | 'network-map' | 'analytics' | 'settings' | 'login';
+export type ViewType = 'overview' | 'stations' | 'alerts' | 'network-map' | 'sensor-health' | 'analytics' | 'settings' | 'login';

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Station } from '../types/telemetry';
 import { HealthPill } from '../components/telemetry/HealthPill';
 import { useRouter, Link } from '../context/RouterContext';
+import { IndiaLeafletMap } from '../components/map/IndiaLeafletMap';
 import { 
   Radio, 
   Zap, 
@@ -33,42 +34,14 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   onSelectStation
 }) => {
   const { navigate } = useRouter();
-  const [selectedStationId, setSelectedStationId] = useState<string>('st-01');
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(stations[0]?.id || null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [baseLayer, setBaseLayer] = useState<'vector' | 'satellite'>('vector');
   const [showTopologyLinks, setShowTopologyLinks] = useState<boolean>(true);
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Compute dynamic geographic bounds from stations list
-  const { minLat, maxLat, minLng, maxLng } = useMemo(() => {
-    if (!stations.length) return { minLat: 18.0, maxLat: 30.0, minLng: 72.0, maxLng: 80.0 };
-    const lats = stations.map(s => s.lat);
-    const lngs = stations.map(s => s.lng);
-    const minL = Math.min(...lats);
-    const maxL = Math.max(...lats);
-    const minG = Math.min(...lngs);
-    const maxG = Math.max(...lngs);
-    const padLat = Math.max(0.4, (maxL - minL) * 0.15);
-    const padLng = Math.max(0.4, (maxG - minG) * 0.15);
-    return {
-      minLat: minL - padLat,
-      maxLat: maxL + padLat,
-      minLng: minG - padLng,
-      maxLng: maxG + padLng
-    };
-  }, [stations]);
-
-  const toCoords = (lat: number, lng: number) => {
-    const spanLng = Math.max(0.001, maxLng - minLng);
-    const spanLat = Math.max(0.001, maxLat - minLat);
-    const x = Math.max(40, Math.min(820, ((lng - minLng) / spanLng) * 740 + 60));
-    const y = Math.max(40, Math.min(500, 490 - ((lat - minLat) / spanLat) * 420));
-    return { x, y };
-  };
+  const [currentState, setCurrentState] = useState<string | null>(null);
 
   const filteredStations = useMemo(() => {
     return stations.filter((st) => {
@@ -93,23 +66,14 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
 
   const activeStation = stations.find(s => s.id === selectedStationId) || stations[0];
 
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(2.5, prev + 0.25));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(0.75, prev - 0.25));
-  const handleResetView = () => {
-    setZoomLevel(1);
-    setPanOffset({ x: 0, y: 0 });
-  };
-
-  const handleSelectStation = (st: Station) => {
+  const handleSelectStation = useCallback((st: Station) => {
     setSelectedStationId(st.id);
-    const coords = toCoords(st.lat, st.lng);
-    // Pan slightly towards selected station
-    setPanOffset({
-      x: (430 - coords.x) * 0.3,
-      y: (270 - coords.y) * 0.3
-    });
     if (onSelectStation) onSelectStation(st);
-  };
+  }, [onSelectStation]);
+
+  const handleStateZoom = useCallback((stateName: string | null) => {
+    setCurrentState(stateName);
+  }, []);
 
   return (
     <div className="network-map-fullscreen-wrapper">
@@ -148,7 +112,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               onClick={() => setBaseLayer('satellite')}
             >
               <Globe size={13} />
-              <span>SATELLITE HUD</span>
+              <span>DARK HUD</span>
             </button>
           </div>
 
@@ -224,25 +188,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           </div>
         </div>
 
-        {/* Interactive Map Viewport */}
-        <div className={`map-viewport-container ${baseLayer === 'satellite' ? 'satellite-mode' : 'vector-mode'}`}>
-          {/* Map Controls Floating Overlay */}
-          <div className="map-floating-controls font-mono">
-            <button onClick={handleZoomIn} className="floating-ctrl-btn" title="Zoom In">
-              <ZoomIn size={16} />
-            </button>
-            <button onClick={handleZoomOut} className="floating-ctrl-btn" title="Zoom Out">
-              <ZoomOut size={16} />
-            </button>
-            <button onClick={handleResetView} className="floating-ctrl-btn" title="Reset / Fit Network">
-              <RotateCcw size={15} />
-            </button>
-            <div className="zoom-indicator-text text-muted">
-              {Math.round(zoomLevel * 100)}%
-            </div>
-          </div>
-
-          {/* Map HUD Status */}
+        {/* Interactive Leaflet Map Viewport */}
+        <div className="map-viewport-container leaflet-viewport">
+          {/* Map HUD Status Legend */}
           <div className="map-hud-legend font-mono">
             <div className="legend-item"><span className="status-dot healthy" /> Healthy ({stations.filter(s => s.status === 'healthy').length})</div>
             <div className="legend-item"><span className="status-dot warning" /> Warning ({stations.filter(s => s.status === 'degraded').length})</div>
@@ -250,141 +198,15 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             <div className="legend-item"><span className="status-dot offline" /> Offline ({stations.filter(s => s.status === 'offline').length})</div>
           </div>
 
-          {/* SVG Map Canvas */}
-          <svg 
-            viewBox="0 0 860 540" 
-            className="fullscreen-map-svg"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            <defs>
-              <pattern id="grid-pattern-full" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-subtle)" strokeWidth="0.75" />
-              </pattern>
-              <pattern id="sub-grid" width="8" height="8" patternUnits="userSpaceOnUse">
-                <path d="M 8 0 L 0 0 0 8" fill="none" stroke="var(--border-subtle)" strokeWidth="0.25" opacity="0.4" />
-              </pattern>
-              <radialGradient id="satellite-glow" cx="50%" cy="50%" r="60%">
-                <stop offset="0%" stopColor="#0284c7" stopOpacity="0.12" />
-                <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
-              </radialGradient>
-            </defs>
-
-            {/* Transform Group for Pan and Zoom */}
-            <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoomLevel})`} style={{ transformOrigin: '430px 270px', transition: 'transform 0.25s ease-out' }}>
-              {/* Grid Background */}
-              <rect width="860" height="540" fill="url(#sub-grid)" />
-              <rect width="860" height="540" fill="url(#grid-pattern-full)" />
-              <circle cx="430" cy="270" r="300" fill="url(#satellite-glow)" />
-
-              {/* Geographic Contour Paths */}
-              <path
-                d="M 100 520 Q 130 400 170 340 T 250 230 Q 290 140 370 70 T 630 50 Q 710 190 670 330 T 590 520 Z"
-                fill="rgba(15, 23, 42, 0.45)"
-                stroke="var(--border-medium)"
-                strokeWidth="1.2"
-                strokeDasharray="6 4"
-              />
-              <path
-                d="M 140 500 Q 180 390 220 300 T 360 170 Q 460 120 540 100"
-                fill="none"
-                stroke="var(--border-subtle)"
-                strokeWidth="0.8"
-              />
-
-              {/* Inter-node Telemetry Links (optimized for 6 nearest cluster links) */}
-              {showTopologyLinks && activeStation && (
-                <g className="spatial-links-group">
-                  {stations
-                    .filter((s) => s.id !== selectedStationId && s.sector === activeStation.sector)
-                    .slice(0, 6)
-                    .map((stB) => {
-                      const posA = toCoords(activeStation.lat, activeStation.lng);
-                      const posB = toCoords(stB.lat, stB.lng);
-                      const isFaultyLink = activeStation.status === 'faulty' || stB.status === 'faulty';
-
-                      return (
-                        <g key={`${activeStation.id}-${stB.id}`}>
-                          <line
-                            x1={posA.x}
-                            y1={posA.y}
-                            x2={posB.x}
-                            y2={posB.y}
-                            stroke={isFaultyLink ? 'var(--state-critical)' : 'var(--state-info)'}
-                            strokeWidth={1.8}
-                            strokeDasharray={isFaultyLink ? '4 3' : 'none'}
-                            opacity={0.8}
-                          />
-                          <circle r="3" fill={isFaultyLink ? 'var(--state-critical)' : 'var(--state-info)'}>
-                            <animateMotion
-                              path={`M ${posA.x} ${posA.y} L ${posB.x} ${posB.y}`}
-                              dur="3s"
-                              repeatCount="indefinite"
-                            />
-                          </circle>
-                        </g>
-                      );
-                    })}
-                </g>
-              )}
-
-              {/* Station Markers */}
-              {stations.map((st) => {
-                const { x, y } = toCoords(st.lat, st.lng);
-                const isSelected = st.id === selectedStationId;
-                const nodeColor = 
-                  st.status === 'healthy' ? 'var(--state-healthy)' :
-                  st.status === 'degraded' ? 'var(--state-warning)' :
-                  st.status === 'faulty' ? 'var(--state-critical)' : 'var(--state-offline)';
-
-                return (
-                  <g 
-                    key={st.id} 
-                    className="map-node-interactive"
-                    onClick={() => handleSelectStation(st)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {/* Active pulse */}
-                    {isSelected && (
-                      <circle cx={x} cy={y} r="18" fill="none" stroke={nodeColor} strokeWidth="1.5" opacity="0.6" className="pulse-circle" />
-                    )}
-
-                    {/* Outer node disc */}
-                    <circle 
-                      cx={x} 
-                      cy={y} 
-                      r={isSelected ? 11 : 8} 
-                      fill="var(--bg-surface)" 
-                      stroke={nodeColor} 
-                      strokeWidth={isSelected ? 2.5 : 1.8} 
-                    />
-                    <circle cx={x} cy={y} r={isSelected ? 4.5 : 3.5} fill={nodeColor} />
-
-                    {/* Code label pill */}
-                    <rect
-                      x={x + 13}
-                      y={y - 11}
-                      width={st.code.length * 6.8 + 14}
-                      height="20"
-                      rx="3"
-                      fill="var(--bg-surface-raised)"
-                      stroke={isSelected ? nodeColor : 'var(--border-subtle)'}
-                      strokeWidth={isSelected ? 1.5 : 0.8}
-                    />
-                    <text
-                      x={x + 20}
-                      y={y + 3}
-                      fill="var(--text-primary)"
-                      fontSize="9"
-                      fontFamily="var(--font-mono)"
-                      fontWeight={isSelected ? '700' : '500'}
-                    >
-                      {st.code}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
+          {/* The Leaflet Map */}
+          <IndiaLeafletMap
+            stations={filteredStations.length > 0 ? filteredStations : stations}
+            selectedStationId={selectedStationId}
+            onSelectStation={handleSelectStation}
+            baseLayer={baseLayer}
+            showTopologyLinks={showTopologyLinks}
+            onStateZoom={handleStateZoom}
+          />
 
           {/* Floating Station Inspector Popup Card */}
           {activeStation && (
@@ -423,7 +245,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               <div className="popup-status-line text-muted">
                 <span>LAT: {activeStation.lat.toFixed(3)}°N</span>
                 <span>·</span>
-                <span>LNG: {activeStation.lng.toFixed(3)}°W</span>
+                <span>LNG: {activeStation.lng.toFixed(3)}°E</span>
                 <span>·</span>
                 <span>SNR: {activeStation.snrDb}dB</span>
               </div>

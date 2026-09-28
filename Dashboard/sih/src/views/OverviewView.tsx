@@ -19,7 +19,8 @@ import {
   RefreshCw,
   CheckCircle2,
   Compass,
-  AlertTriangle
+  AlertTriangle,
+  Activity
 } from '../components/icons';
 import { 
   LiveWeatherData, 
@@ -770,6 +771,74 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* 3.2 Sensor Health Status Card */}
+          <div className="card-sensor-health panel" style={{ padding: '24px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-card)', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-title-row" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <span className="card-section-title">AWS Sensor Health</span>
+              <Activity size={16} className="text-[#004e99]" />
+            </div>
+            
+            <div className="flex flex-col gap-5 mt-2">
+              {/* Healthy */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-slate-700">Healthy (Nominal)</span>
+                  <span className="text-sm font-bold text-emerald-600">
+                    {stations.filter(s => s.status === 'healthy').length} ({Math.round(stations.filter(s => s.status === 'healthy').length / Math.max(1, stations.length) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div className="bg-emerald-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(stations.filter(s => s.status === 'healthy').length / Math.max(1, stations.length)) * 100}%` }}></div>
+                </div>
+              </div>
+
+              {/* Degraded */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-slate-700">Degraded (Warning)</span>
+                  <span className="text-sm font-bold text-orange-500">
+                    {stations.filter(s => s.status === 'degraded').length} ({Math.round(stations.filter(s => s.status === 'degraded').length / Math.max(1, stations.length) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div className="bg-orange-400 h-2 rounded-full transition-all duration-1000" style={{ width: `${(stations.filter(s => s.status === 'degraded').length / Math.max(1, stations.length)) * 100}%` }}></div>
+                </div>
+              </div>
+
+              {/* Faulty */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-slate-700">Faulty (Critical)</span>
+                  <span className="text-sm font-bold text-red-600">
+                    {stations.filter(s => s.status === 'faulty').length} ({Math.round(stations.filter(s => s.status === 'faulty').length / Math.max(1, stations.length) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div className="bg-red-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(stations.filter(s => s.status === 'faulty').length / Math.max(1, stations.length)) * 100}%` }}></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-auto pt-5 mt-6 border-t border-slate-100">
+              <div className="text-[11px] font-mono text-slate-500 font-bold mb-3">CRITICAL ALERTS</div>
+              {alerts.filter(a => a.severity === 'critical').slice(0, 3).map(alert => (
+                <div key={alert.id} className="flex items-start gap-2 mb-2.5 p-2 bg-red-50 rounded border border-red-100 cursor-pointer hover:bg-red-100 transition-colors" onClick={() => navigate('/alerts')}>
+                  <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-red-700">{alert.stationId}</div>
+                    <div className="text-[10px] text-red-600 font-mono leading-tight truncate-multiline" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{alert.message}</div>
+                  </div>
+                </div>
+              ))}
+              {alerts.filter(a => a.severity === 'critical').length === 0 && (
+                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 p-2 bg-emerald-50 rounded border border-emerald-100">
+                  <CheckCircle2 size={14} />
+                  No critical sensor faults detected.
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -47,14 +47,20 @@ FAULT_CLASS_MAP = {
 INV_FAULT_CLASS_MAP = {v: k for k, v in FAULT_CLASS_MAP.items()}
 
 FEATURE_COLS = [
-    "T_obs", "P_obs", "RH_obs",
     "dew_point_spread", "phys_violation_flag", "rh_supersat_excess",
     "temp_step_zscore", "pres_step_zscore", "rh_step_zscore",
     "is_frozen_flag", "temporal_anomaly_score",
     "T_spatial_resid", "P_spatial_resid", "RH_spatial_resid",
-    "spatial_divergence_score",
-    # Diurnal / seasonal features (sin-cos encoded)
-    "hour_sin", "hour_cos", "doy_sin", "doy_cos",
+    "spatial_divergence_score", "is_spike_flag",
+    # New Engineered Features
+    "T_missing", "P_missing", "RH_missing",
+    "T_roll_var", "P_roll_var", "RH_roll_var",
+    "T_diff", "P_diff", "RH_diff",
+    "abs_T_diff", "abs_P_diff", "abs_RH_diff",
+    "abs_T_zscore", "abs_P_zscore", "abs_RH_zscore",
+    "min_roll_var", "max_abs_diff", "max_abs_zscore",
+    # Diurnal features (sin-cos encoded)
+    "hour_sin", "hour_cos",
 ]
 
 EARTH_RADIUS_KM = 6371.0
@@ -173,7 +179,14 @@ class TemporalAnomalyDetector:
         df = df.sort_values(["station_id", "timestamp"]).copy()
 
         for col in ["temp_step_zscore","pres_step_zscore","rh_step_zscore",
-                    "is_frozen_flag","temporal_anomaly_score"]:
+                    "is_frozen_flag","temporal_anomaly_score",
+                    "T_missing", "P_missing", "RH_missing",
+                    "T_roll_var", "P_roll_var", "RH_roll_var",
+                    "T_diff", "P_diff", "RH_diff",
+                    "abs_T_diff", "abs_P_diff", "abs_RH_diff",
+                    "abs_T_zscore", "abs_P_zscore", "abs_RH_zscore",
+                    "min_roll_var", "max_abs_diff", "max_abs_zscore",
+                    "is_spike_flag"]:
             df[col] = 0.0
 
         for sid, grp in df.groupby("station_id"):
@@ -181,12 +194,46 @@ class TemporalAnomalyDetector:
             df.loc[idx, "temp_step_zscore"] = self._rolling_zscore(grp["T_obs"],  self.step_window).values
             df.loc[idx, "pres_step_zscore"] = self._rolling_zscore(grp["P_obs"],  self.step_window).values
             df.loc[idx, "rh_step_zscore"]   = self._rolling_zscore(grp["RH_obs"], self.step_window).values
-            df.loc[idx, "is_frozen_flag"]   = self._persistence_flag(grp["T_obs"], self.persist_window).values
+            
+            t_froz = self._persistence_flag(grp["T_obs"], self.persist_window).values
+            p_froz = self._persistence_flag(grp["P_obs"], self.persist_window).values
+            rh_froz = self._persistence_flag(grp["RH_obs"], self.persist_window).values
+            df.loc[idx, "is_frozen_flag"]   = np.maximum.reduce([t_froz, p_froz, rh_froz])
+            
+            
+            # Missing indicators
+            df.loc[idx, "T_missing"] = grp["T_obs"].isna().astype(float).values
+            df.loc[idx, "P_missing"] = grp["P_obs"].isna().astype(float).values
+            df.loc[idx, "RH_missing"] = grp["RH_obs"].isna().astype(float).values
+            
+            # Rolling variance
+            df.loc[idx, "T_roll_var"] = grp["T_obs"].rolling(window=self.step_window, min_periods=2).var().fillna(0.0).values
+            df.loc[idx, "P_roll_var"] = grp["P_obs"].rolling(window=self.step_window, min_periods=2).var().fillna(0.0).values
+            df.loc[idx, "RH_roll_var"] = grp["RH_obs"].rolling(window=self.step_window, min_periods=2).var().fillna(0.0).values
+            
+            # Raw difference
+            df.loc[idx, "T_diff"] = grp["T_obs"].diff().fillna(0.0).values
+            df.loc[idx, "P_diff"] = grp["P_obs"].diff().fillna(0.0).values
+            df.loc[idx, "RH_diff"] = grp["RH_obs"].diff().fillna(0.0).values
+            
+            df.loc[idx, "abs_T_diff"] = np.abs(df.loc[idx, "T_diff"])
+            df.loc[idx, "abs_P_diff"] = np.abs(df.loc[idx, "P_diff"])
+            df.loc[idx, "abs_RH_diff"] = np.abs(df.loc[idx, "RH_diff"])
+            
+            df.loc[idx, "abs_T_zscore"] = np.abs(df.loc[idx, "temp_step_zscore"])
+            df.loc[idx, "abs_P_zscore"] = np.abs(df.loc[idx, "pres_step_zscore"])
+            df.loc[idx, "abs_RH_zscore"] = np.abs(df.loc[idx, "rh_step_zscore"])
+            
+            df.loc[idx, "min_roll_var"] = np.minimum.reduce([df.loc[idx, "T_roll_var"], df.loc[idx, "P_roll_var"], df.loc[idx, "RH_roll_var"]])
+            df.loc[idx, "max_abs_diff"] = np.maximum.reduce([df.loc[idx, "abs_T_diff"], df.loc[idx, "abs_P_diff"], df.loc[idx, "abs_RH_diff"]])
+            df.loc[idx, "max_abs_zscore"] = np.maximum.reduce([df.loc[idx, "abs_T_zscore"], df.loc[idx, "abs_P_zscore"], df.loc[idx, "abs_RH_zscore"]])
+            df.loc[idx, "is_spike_flag"] = (df.loc[idx, "max_abs_zscore"] > 3.0).astype(float)
 
             feat_arr = np.column_stack([
                 df.loc[idx, "T_obs"].values, df.loc[idx, "P_obs"].values, df.loc[idx, "RH_obs"].values,
                 df.loc[idx, "temp_step_zscore"].values, df.loc[idx, "pres_step_zscore"].values,
                 df.loc[idx, "rh_step_zscore"].values,
+                df.loc[idx, "T_diff"].values, df.loc[idx, "P_diff"].values, df.loc[idx, "RH_diff"].values,
             ])
             feat_arr = np.nan_to_num(feat_arr, nan=0.0)
 
@@ -331,11 +378,15 @@ class RootCauseClassifier:
 
         class_counts = np.bincount(y_tr, minlength=len(FAULT_CLASS_MAP))
         class_weight = len(y_tr) / (len(FAULT_CLASS_MAP) * (class_counts + 1))
+        
+        # Boost SPIKE class (1) to heavily penalize false negatives
+        if 1 < len(class_weight):
+            class_weight[1] *= 2.5
 
         lgb_params = dict(
             objective="multiclass", num_class=len(FAULT_CLASS_MAP), metric="multi_logloss",
-            n_estimators=400, learning_rate=0.05, num_leaves=31, max_depth=6,
-            min_child_samples=5, subsample=0.8, colsample_bytree=0.8,
+            n_estimators=800, learning_rate=0.03, num_leaves=63, max_depth=8,
+            min_child_samples=2, subsample=0.8, colsample_bytree=0.8,
             reg_alpha=0.1, reg_lambda=0.1, random_state=self.random_state,
             n_jobs=-1, verbose=-1,
             class_weight={i: w for i, w in enumerate(class_weight)},
@@ -383,6 +434,7 @@ class RootCauseClassifier:
             "class_weight": {i: w for i, w in enumerate(class_weight)},
         })
         y_cv_pred = cross_val_predict(cv_model, X, y, cv=skf, n_jobs=-1)
+        y_cv_proba = cross_val_predict(cv_model, X, y, cv=skf, n_jobs=-1, method='predict_proba')
         print(classification_report(
             y, y_cv_pred,
             labels=all_labels, target_names=target_names,
@@ -431,8 +483,17 @@ class RootCauseClassifier:
         print(f"  ML improvement over baseline  : +{lgbm_f1_cv - base_f1:.4f}  (CV-based)")
         print("="*70)
 
-        proba  = self.model_.predict_proba(X)
-        y_full = self.model_.predict(X)
+        self.logger.info("Retraining final LightGBM model on full dataset...")
+        final_model = lgb.LGBMClassifier(**{
+            **lgb_params,
+            "n_estimators": 400  # Train on full data
+        })
+        final_model.fit(X, y)
+        self.model_ = final_model
+
+        # Use out-of-fold predictions for the honest benchmark stream
+        proba  = y_cv_proba
+        y_full = y_cv_pred
         df["predicted_class"]  = y_full
         df["predicted_fault"]  = [INV_FAULT_CLASS_MAP[c] for c in y_full]
         df["fault_confidence"] = proba.max(axis=1)

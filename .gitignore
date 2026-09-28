@@ -65,3 +65,4 @@ EDGE/spool_*.jsonl
 .idea/
 .DS_Store
 Thumbs.db
+test.csv

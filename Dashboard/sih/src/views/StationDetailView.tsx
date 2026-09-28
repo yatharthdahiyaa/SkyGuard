@@ -54,12 +54,16 @@ export const StationDetailView: React.FC<StationDetailViewProps> = ({
     temp: TimeSeriesPoint[];
     press: TimeSeriesPoint[];
     rh: TimeSeriesPoint[];
-    anomalyMarkers: AnomalyMarker[];
+    anomalyMarkersTemp: AnomalyMarker[];
+    anomalyMarkersPress: AnomalyMarker[];
+    anomalyMarkersRh: AnomalyMarker[];
   }>({
     temp: [],
     press: [],
     rh: [],
-    anomalyMarkers: []
+    anomalyMarkersTemp: [],
+    anomalyMarkersPress: [],
+    anomalyMarkersRh: []
   });
 
   useEffect(() => {
@@ -76,7 +80,9 @@ export const StationDetailView: React.FC<StationDetailViewProps> = ({
         temp: tData.series,
         press: pData.series,
         rh: rhData.series,
-        anomalyMarkers: [...tData.anomalyMarkers, ...pData.anomalyMarkers, ...rhData.anomalyMarkers]
+        anomalyMarkersTemp: tData.anomalyMarkers,
+        anomalyMarkersPress: pData.anomalyMarkers,
+        anomalyMarkersRh: rhData.anomalyMarkers
       });
     }).catch(err => {
       console.warn('Failed to load live station telemetry time-series:', err);
@@ -128,9 +134,9 @@ export const StationDetailView: React.FC<StationDetailViewProps> = ({
   }, [telemetrySeries.temp, station.readings?.vibrationRms]);
 
   const multiSeriesList: MetricSeriesConfig[] = [
-    { id: 'T', label: 'Temperature (T)', unit: '°C', color: '#f97316', points: telemetrySeries.temp },
-    { id: 'P', label: 'Pressure (P)', unit: 'hPa', color: '#06b6d4', points: telemetrySeries.press },
-    { id: 'RH', label: 'Humidity (RH)', unit: '%', color: '#3b82f6', points: telemetrySeries.rh },
+    { id: 'T', label: 'Temperature (T)', unit: '°C', color: '#f97316', points: telemetrySeries.temp, anomalyMarkers: telemetrySeries.anomalyMarkersTemp },
+    { id: 'P', label: 'Pressure (P)', unit: 'hPa', color: '#06b6d4', points: telemetrySeries.press, anomalyMarkers: telemetrySeries.anomalyMarkersPress },
+    { id: 'RH', label: 'Humidity (RH)', unit: '%', color: '#3b82f6', points: telemetrySeries.rh, anomalyMarkers: telemetrySeries.anomalyMarkersRh },
     { id: 'voltage', label: 'RTU Bus Voltage', unit: 'V', color: '#10b981', points: voltSeries },
     { id: 'current', label: 'Loop Current', unit: 'A', color: '#6366f1', points: currSeries },
     { id: 'signal', label: 'Carrier RSSI', unit: 'dBm', color: '#ec4899', points: sigSeries },
@@ -296,7 +302,6 @@ export const StationDetailView: React.FC<StationDetailViewProps> = ({
             ? { startIndex: 24, endIndex: 40, label: 'Harmonic Bearing Anomaly & Polymer Drift', severity: 'critical' }
             : undefined
         }
-        anomalyMarkers={telemetrySeries.anomalyMarkers}
         height={280}
       />
 

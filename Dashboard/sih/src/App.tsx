@@ -22,6 +22,8 @@ import { AlertsView } from './views/AlertsView';
 import { AlertDetailView } from './views/AlertDetailView';
 import { NetworkMapView } from './views/NetworkMapView';
 import { AnalyticsView } from './views/AnalyticsView';
+import { SensorHealthView } from './views/SensorHealthView';
+import { SensorHealthDetailView } from './views/SensorHealthDetailView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
 
@@ -749,6 +751,7 @@ function AppContent() {
   // Route Matching
   const stationDetailMatch = matchRoute('/stations/:stationId', path);
   const alertDetailMatch = matchRoute('/alerts/:alertId', path);
+  const sensorHealthDetailMatch = matchRoute('/sensor-health/:stationId', path);
 
   return (
     <AppShell
@@ -820,6 +823,19 @@ function AppContent() {
         <NetworkMapView
           stations={stations}
           onSelectStation={(st) => navigate(`/stations/${st.id}`)}
+        />
+      )}
+
+      {/* Route 6.5: /sensor-health (Sensor Health Dashboard) */}
+      {path === '/sensor-health' && (
+        <SensorHealthView stations={stations} />
+      )}
+
+      {/* Route 6.6: /sensor-health/:stationId (Sensor Health Detail) */}
+      {sensorHealthDetailMatch.matches && (
+        <SensorHealthDetailView
+          stationId={sensorHealthDetailMatch.params.stationId}
+          stations={stations}
         />
       )}
 

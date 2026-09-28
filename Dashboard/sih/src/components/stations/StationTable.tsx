@@ -227,31 +227,64 @@ export const StationTable: React.FC<StationTableProps> = ({
       </div>
 
       {/* Pagination Footer */}
-      <div className="table-pagination-footer font-mono">
-        <span className="pagination-info text-muted">
+      <div className="table-pagination-footer font-mono flex items-center justify-between" style={{ padding: '12px 16px', borderTop: '1px solid var(--border-subtle)', background: '#f8fafc' }}>
+        <span className="pagination-info text-muted" style={{ fontSize: '11px', fontWeight: 600 }}>
           PAGE {page} OF {totalPages} ({stations.length} TOTAL STATIONS)
         </span>
-        <div className="pagination-buttons">
+        <div className="pagination-buttons flex items-center gap-1">
           <button 
             className="btn-page" 
             disabled={page <= 1} 
             onClick={() => setPage(p => Math.max(p - 1, 1))}
+            style={{ padding: '4px 8px', borderRadius: '4px', background: '#ffffff', border: '1px solid #cbd5e1', cursor: page <= 1 ? 'not-allowed' : 'pointer', color: '#334155', fontSize: '11px', fontWeight: 600 }}
           >
             PREV
           </button>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i}
-              className={`btn-page-num ${page === i + 1 ? 'active' : ''}`}
-              onClick={() => setPage(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
+
+          {(() => {
+            const pages = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+              if (page <= 4) {
+                pages.push(1, 2, 3, 4, 5, '...', totalPages);
+              } else if (page >= totalPages - 3) {
+                pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+              } else {
+                pages.push(1, '...', page - 1, page, page + 1, '...', totalPages);
+              }
+            }
+            return pages.map((p, i) => (
+              p === '...' ? (
+                <span key={`ell-${i}`} style={{ padding: '0 4px', color: '#64748b' }}>...</span>
+              ) : (
+                <button
+                  key={p}
+                  className={`btn-page-num ${page === p ? 'active' : ''}`}
+                  onClick={() => setPage(p as number)}
+                  style={{ 
+                    padding: '4px 8px', 
+                    borderRadius: '4px', 
+                    background: page === p ? '#004e99' : '#ffffff', 
+                    color: page === p ? '#ffffff' : '#334155',
+                    border: '1px solid',
+                    borderColor: page === p ? '#004e99' : '#cbd5e1',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 600
+                  }}
+                >
+                  {p}
+                </button>
+              )
+            ));
+          })()}
+
           <button 
             className="btn-page" 
             disabled={page >= totalPages} 
             onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+            style={{ padding: '4px 8px', borderRadius: '4px', background: '#ffffff', border: '1px solid #cbd5e1', cursor: page >= totalPages ? 'not-allowed' : 'pointer', color: '#334155', fontSize: '11px', fontWeight: 600 }}
           >
             NEXT
           </button>
