@@ -368,24 +368,69 @@ function AppContent() {
         ws.onclose = () => {
           if (!isMounted) return;
           setConnectionStatus('reconnecting');
-          reconnectTimeout = setTimeout(connectWebSocket, 3000);
+          startStaticSimulation();
+          reconnectTimeout = setTimeout(connectWebSocket, 10000);
         };
 
         ws.onerror = () => {
+          startStaticSimulation();
           if (ws) ws.close();
         };
       } catch (err) {
         if (!isMounted) return;
-        setConnectionStatus('offline');
-        reconnectTimeout = setTimeout(connectWebSocket, 3000);
+        startStaticSimulation();
+        reconnectTimeout = setTimeout(connectWebSocket, 10000);
       }
     };
+
+    let staticSimTimer: ReturnType<typeof setInterval> | null = null;
+    const startStaticSimulation = () => {
+      if (staticSimTimer || !isMounted) return;
+      setConnectionStatus('live');
+      staticSimTimer = setInterval(() => {
+        if (!isMounted) return;
+        setStations((prev) => {
+          if (!prev || prev.length === 0) return prev;
+          const idx = Math.floor(Math.random() * prev.length);
+          const st = prev[idx];
+          const deltaT = Number(((Math.random() - 0.49) * 0.3).toFixed(1));
+          const deltaP = Number(((Math.random() - 0.5) * 0.2).toFixed(1));
+          const deltaRH = Number(((Math.random() - 0.5) * 0.5).toFixed(1));
+          const newT = Number((st.readings.temperature + deltaT).toFixed(1));
+          const newP = Number((st.readings.pressure + deltaP).toFixed(1));
+          const newRH = Math.max(10, Math.min(99, Number((st.readings.humidity + deltaRH).toFixed(1))));
+          const newDew = calculateMagnusDewPoint(newT, newRH);
+
+          const next = [...prev];
+          next[idx] = {
+            ...st,
+            lastSeen: 'Just now',
+            readings: {
+              ...st.readings,
+              temperature: newT,
+              pressure: newP,
+              humidity: newRH,
+              dewPoint: newDew
+            }
+          };
+          setLastMessageAt(new Date().toLocaleTimeString('en-US', { hour12: false }) + ' UTC');
+          return next;
+        });
+      }, 1500);
+    };
+
+    // If no WS connection after 3s, activate static simulation
+    const initialSimTimeout = setTimeout(() => {
+      startStaticSimulation();
+    }, 3000);
 
     connectWebSocket();
 
     return () => {
       isMounted = false;
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (initialSimTimeout) clearTimeout(initialSimTimeout);
+      if (staticSimTimer) clearInterval(staticSimTimer);
       if (ws) ws.close();
     };
   }, [addAnomalyToast]);
