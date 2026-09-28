@@ -57,8 +57,21 @@ export interface AnalyticsSummary {
   meanTimeBetweenFailuresHours: number;
 }
 
-const RAW_API_BASE = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-const API_BASE = `${RAW_API_BASE}/api/v1`;
+const getApiBase = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('skyguard_backend_url');
+    if (custom) return custom.replace(/\/$/, '');
+  }
+  const envBase = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  if (envBase) return envBase;
+  // If hosted on a static host like Hugging Face, default to the live Render cloud cluster
+  if (typeof window !== 'undefined' && window.location.hostname.includes('hf.space')) {
+    return 'https://skyguard-ioks.onrender.com';
+  }
+  return '';
+};
+const RAW_API_BASE = getApiBase();
+const API_BASE = RAW_API_BASE ? `${RAW_API_BASE}/api/v1` : '/api/v1';
 
 /**
  * TelemetryAPI: Centralized live asynchronous service layer.

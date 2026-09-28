@@ -159,17 +159,14 @@ function AppContent() {
       if (!isMounted) return;
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const storedBackend = localStorage.getItem('skyguard_backend_url');
-      const customWsBase = storedBackend || import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;
-      
       const isStaticHost = window.location.hostname.includes('hf.space') || 
                            window.location.hostname.includes('github.io') ||
                            window.location.hostname.includes('vercel.app');
 
-      // If hosted statically without an explicit backend and already attempted, seamlessly stay in autonomous mode
-      if (!customWsBase && isStaticHost && retryAttempts >= 1) {
-        startStaticSimulation();
-        return;
-      }
+      const customWsBase = storedBackend || 
+                           import.meta.env.VITE_WS_URL || 
+                           import.meta.env.VITE_API_URL || 
+                           (isStaticHost ? 'https://skyguard-ioks.onrender.com' : undefined);
 
       const wsUrl = customWsBase
         ? `${customWsBase.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/live`
